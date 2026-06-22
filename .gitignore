@@ -1,30 +1,8 @@
-# Case data (sensitive - kabhi GitHub par na jaaye)
-data/case_management.xlsx
-data/*.xlsx
-*.xlsx
-!sample*.xlsx
-
-# Python
 __pycache__/
 *.pyc
-*.pyo
-.Python
-*.egg-info/
 .venv/
 venv/
-env/
-
-# Streamlit
+*.xlsx
+!sample*.xlsx
 .streamlit/secrets.toml
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Editor files
-.vscode/
-.idea/
-*.swp
-
-# Logs
 *.log

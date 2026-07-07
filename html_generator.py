@@ -29,11 +29,12 @@ NYAYALAYA_MAP = {
 }
 
 def resolve_court(raw, janpad):
+    """Returns (court_name_only, full_display, is_session)"""
     raw_up = str(raw).upper().strip()
     for key, (name, is_session) in NYAYALAYA_MAP.items():
         if key in raw_up:
-            return f"{name} जनपद {janpad}", is_session
-    return f"{raw} जनपद {janpad}", False
+            return name, f"{name} जनपद {janpad}", is_session
+    return str(raw).strip(), f"{str(raw).strip()} जनपद {janpad}", False
 
 def clean_col(name):
     return re.sub(r'\s+', ' ', str(name)).strip()
@@ -189,7 +190,15 @@ CSS = """
     text-align: right;
     font-size: 10pt;
     margin-top: auto;
-    line-height: 1.6;
+  }
+  .sign-space {
+    height: 14mm;
+    display: block;
+  }
+  .sign-lines div {
+    margin: 0;
+    padding: 0;
+    line-height: 1.25;
   }
 
   /* VC Letter */
@@ -231,7 +240,7 @@ CSS = """
 """
 
 def block_html(row_data, stype, janpad):
-    court_disp, is_session = resolve_court(row_data.get(COL["nyayalaya"], ""), janpad)
+    court_name, court_disp, is_session = resolve_court(row_data.get(COL["nyayalaya"], ""), janpad)
     st_no   = str(row_data.get(COL["st_no"],    "")).strip()
     mu_no   = str(row_data.get(COL["mu_apradh"],"")).strip()
     banam   = str(row_data.get(COL["banam"],    "")).strip()
@@ -261,7 +270,14 @@ def block_html(row_data, stype, janpad):
       <div class="witness-name">{witness}</div>
       <div class="body-text">{BODY[stype]}</div>
       {note_html}
-      <div class="sign">{court_disp}<br/>{today}</div>
+      <div class="sign">
+        <span class="sign-space"></span>
+        <div class="sign-lines">
+          <div>{court_name}</div>
+          <div>जनपद {janpad}</div>
+          <div>{today}</div>
+        </div>
+      </div>
     </div>"""
 
 
@@ -277,7 +293,7 @@ def vc_html(row, janpad):
     vc_sthan    = str(row.get("VC स्थान", "पुलिस कार्यालय")).strip()
     vc_samay    = str(row.get("VC समय", "12:30 PM")).strip()
     prati_pad   = str(row.get("प्रति पद", "पुलिस अधीक्षक")).strip()
-    praapak, _ = resolve_court(court_raw, janpad)
+    _, praapak, _ = resolve_court(court_raw, janpad)
     today = datetime.today().strftime('%d/%m/%Y')
 
     return f"""

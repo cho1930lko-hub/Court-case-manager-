@@ -1,327 +1,436 @@
 """
-⚖️ Court Case Manager
-- Google Sheet से case data पढ़ना/लिखना
-- नया case जोड़ना, नया column जोड़ना
-- Bulk समन/वारंट DOCX generate करना
+⚖️ पैरवी रजिस्टर — Court Case Management System
+भिंगा, जनपद श्रावस्ती
 """
 import streamlit as st
 import pandas as pd
-import json
-import io
 from datetime import datetime
+import gsheet as gs
+import summon_gen as sg
 
-st.set_page_config(page_title="Court Case Manager", page_icon="⚖️", layout="wide")
+st.set_page_config(
+    page_title="पैरवी रजिस्टर — भिंगा",
+    page_icon="⚖️",
+    layout="wide"
+)
 
-# ── Google Sheets connection ─────────────────────────────────────────────────
-def get_gsheet_client():
-    try:
-        import gspread
-        from google.oauth2.service_account import Credentials
-        creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-        creds = Credentials.from_service_account_info(
-            creds_dict,
-            scopes=["https://spreadsheets.google.com/feeds",
-                    "https://www.googleapis.com/auth/drive"]
-        )
-        return gspread.authorize(creds)
-    except Exception as e:
-        st.error(f"Google Sheets connection failed: {e}")
-        return None
+JANPAD = st.secrets.get("JANPAD", "श्रावस्ती")
 
-
-@st.cache_data(ttl=60)
-def load_sheet(sheet_url: str, worksheet_name: str = None):
-    """Sheet से data load करता है — 60 sec cache"""
-    client = get_gsheet_client()
-    if not client: return pd.DataFrame()
-    try:
-        sh = client.open_by_url(sheet_url)
-        ws = sh.worksheet(worksheet_name) if worksheet_name else sh.get_worksheet(0)
-        data = ws.get_all_records()
-        return pd.DataFrame(data).fillna("")
-    except Exception as e:
-        st.error(f"Sheet load error: {e}")
-        return pd.DataFrame()
-
-
-def append_row(sheet_url: str, row_data: dict, worksheet_name: str = None):
-    """Sheet में नई row जोड़ता है"""
-    client = get_gsheet_client()
-    if not client: return False
-    try:
-        sh = client.open_by_url(sheet_url)
-        ws = sh.worksheet(worksheet_name) if worksheet_name else sh.get_worksheet(0)
-        headers = ws.row_values(1)
-        new_row = [str(row_data.get(h, "")) for h in headers]
-        ws.append_row(new_row)
-        return True
-    except Exception as e:
-        st.error(f"Row append error: {e}")
-        return False
-
-
-def add_column(sheet_url: str, col_name: str, worksheet_name: str = None):
-    """Sheet में नया column जोड़ता है"""
-    client = get_gsheet_client()
-    if not client: return False
-    try:
-        sh = client.open_by_url(sheet_url)
-        ws = sh.worksheet(worksheet_name) if worksheet_name else sh.get_worksheet(0)
-        headers = ws.row_values(1)
-        if col_name in headers:
-            return "exists"
-        next_col = len(headers) + 1
-        ws.update_cell(1, next_col, col_name)
-        return True
-    except Exception as e:
-        st.error(f"Column add error: {e}")
-        return False
-
-
-# ── Session state init ────────────────────────────────────────────────────────
-if "sheet_url" not in st.session_state:
-    st.session_state.sheet_url = st.secrets.get("DEFAULT_SHEET_URL", "")
-if "ws_name" not in st.session_state:
-    st.session_state.ws_name = ""
-
-# ── Sidebar ──────────────────────────────────────────────────────────────────
+# ── Sidebar Navigation ────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("⚖️ Court Case Manager")
+    st.markdown("## ⚖️ पैरवी रजिस्टर")
+    st.markdown(f"**भिंगा, जनपद {JANPAD}**")
     st.divider()
 
-    st.subheader("🔗 Google Sheet")
-    sheet_url = st.text_input("Sheet URL", value=st.session_state.sheet_url,
-                               placeholder="https://docs.google.com/spreadsheets/d/...")
-    ws_name = st.text_input("Worksheet नाम (खाली = पहली sheet)",
-                             value=st.session_state.ws_name,
-                             placeholder="जैसे: पैरवी रजिस्टर")
-    janpad = st.text_input("जनपद", value=st.secrets.get("DEFAULT_JANPAD", "श्रावस्ती"))
-
-    if sheet_url:
-        st.session_state.sheet_url = sheet_url
-        st.session_state.ws_name = ws_name
+    page = st.radio("", [
+        "📊 Dashboard",
+        "📋 सेशन कोर्ट",
+        "➕ नया केस",
+        "✏️ केस अपडेट",
+        "🖨️ समन जनरेटर",
+        "📬 Dak Register",
+        "🔒 Rimand Register",
+    ], label_visibility="collapsed")
 
     st.divider()
-    page = st.radio("📌 पेज", ["📋 केस लिस्ट", "➕ नया केस जोड़ें",
-                                 "🖨️ समन जनरेटर", "⚙️ Column जोड़ें"])
-
-# ── Main area ────────────────────────────────────────────────────────────────
-
-def load_data():
-    if not st.session_state.sheet_url:
-        st.warning("Sidebar में Google Sheet URL डालें।")
-        return pd.DataFrame()
-    ws = st.session_state.ws_name or None
-    return load_sheet(st.session_state.sheet_url, ws)
+    if st.button("🔄 Data Refresh", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+    st.caption(f"आज: {gs.today_str()}")
 
 
-# ══ Page 1: Case List ════════════════════════════════════════════════════════
-if page == "📋 केस लिस्ट":
-    st.header("📋 केस लिस्ट")
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+if page == "📊 Dashboard":
+    st.header("📊 Dashboard")
 
-    col_refresh, col_search, col_filter = st.columns([1, 3, 2])
-    with col_refresh:
-        if st.button("🔄 Refresh", use_container_width=True):
-            st.cache_data.clear()
+    df_s = gs.load_session()
+    df_d = gs.load_dak()
 
-    df = load_data()
-    if df.empty:
-        st.info("Sheet से data नहीं मिला।")
+    if df_s.empty:
+        st.warning("सेशन कोर्ट sheet से data नहीं मिला।")
         st.stop()
 
-    with col_search:
-        search = st.text_input("🔍 खोजें (नाम / ST NO / धारा)", "")
-    with col_filter:
-        if "अगली तारीख पेशी" in df.columns:
-            dates = ["सभी तारीखें"] + sorted(df["अगली तारीख पेशी"].unique().tolist())
-            date_filter = st.selectbox("तारीख से फ़िल्टर", dates)
+    # ── Stats row ────────────────────────────────────────────────────────────
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    total   = len(df_s[df_s["ST NO"].astype(str).str.strip() != ""])
+    sakshya = len(df_s[df_s["Status"] == "साक्ष्य"])
+    pending_samman = len(df_s[df_s["सम्मन की स्थिति"].astype(str).str.strip() == "बनाना है"])
+    dak_incomplete = len(df_d[df_d["status"].astype(str).str.strip() == "INCOMPLETE"])
+    today_str = gs.today_str()
+    aaj_peshi = len(df_s[df_s["अगली तारीख पेशी"].astype(str).str.strip() == today_str])
+
+    c1.metric("कुल मुकदमे", total)
+    c2.metric("साक्ष्य stage", sakshya)
+    c3.metric("समन बनाने हैं", pending_samman, delta=f"बनाना है")
+    c4.metric("Dak Pending", dak_incomplete)
+    c5.metric("आज की पेशी", aaj_peshi)
+
+    st.divider()
+
+    col1, col2 = st.columns(2)
+
+    # ── Status chart ─────────────────────────────────────────────────────────
+    with col1:
+        st.subheader("📌 Status-wise मुकदमे")
+        status_count = df_s[df_s["Status"] != ""]["Status"].value_counts().reset_index()
+        status_count.columns = ["Status", "Count"]
+        st.dataframe(status_count, use_container_width=True, hide_index=True)
+
+    # ── आज की पेशी ───────────────────────────────────────────────────────────
+    with col2:
+        st.subheader(f"📅 आज की पेशी ({today_str})")
+        aaj = df_s[df_s["अगली तारीख पेशी"].astype(str).str.strip() == today_str]
+        if aaj.empty:
+            st.info("आज कोई पेशी नहीं।")
         else:
-            date_filter = "सभी तारीखें"
+            st.dataframe(
+                aaj[["ST NO", "बनाम", "न्यायालय", "Status", "तलब साक्षी"]],
+                use_container_width=True, hide_index=True
+            )
+
+    st.divider()
+
+    # ── Pending समन ──────────────────────────────────────────────────────────
+    st.subheader("🖨️ समन बनाने हैं")
+    pending = df_s[df_s["सम्मन की स्थिति"].astype(str).str.strip() == "बनाना है"]
+    if pending.empty:
+        st.success("कोई समन pending नहीं।")
+    else:
+        st.dataframe(
+            pending[["ST NO", "बनाम", "न्यायालय", "तलब साक्षी", "अगली तारीख पेशी"]],
+            use_container_width=True, hide_index=True
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. SESSION COURT LIST
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📋 सेशन कोर्ट":
+    st.header("📋 सेशन कोर्ट — केस लिस्ट")
+
+    df = gs.load_session()
+    if df.empty:
+        st.warning("Data नहीं मिला।")
+        st.stop()
+
+    # ── Filters ──────────────────────────────────────────────────────────────
+    f1, f2, f3, f4 = st.columns(4)
+    with f1:
+        search = st.text_input("🔍 खोजें", placeholder="नाम / ST NO / धारा")
+    with f2:
+        status_f = st.selectbox("Status", ["सभी"] + gs.STATUS_OPTIONS)
+    with f3:
+        ny_f = st.selectbox("न्यायालय", ["सभी"] + gs.NYAYALAYA_OPTIONS)
+    with f4:
+        samman_f = st.selectbox("सम्मन स्थिति", ["सभी"] + gs.SAMMAN_OPTIONS)
 
     # Apply filters
-    filtered = df.copy()
+    filtered = df[df["ST NO"].astype(str).str.strip() != ""].copy()
     if search:
-        mask = filtered.apply(
-            lambda r: search.lower() in " ".join(r.astype(str)).lower(), axis=1)
+        mask = filtered.apply(lambda r: search.lower() in " ".join(r.astype(str)).lower(), axis=1)
         filtered = filtered[mask]
-    if date_filter != "सभी तारीखें" and "अगली तारीख पेशी" in filtered.columns:
-        filtered = filtered[filtered["अगली तारीख पेशी"] == date_filter]
+    if status_f != "सभी":
+        filtered = filtered[filtered["Status"] == status_f]
+    if ny_f != "सभी":
+        filtered = filtered[filtered["न्यायालय"].str.contains(ny_f, na=False)]
+    if samman_f != "सभी":
+        filtered = filtered[filtered["सम्मन की स्थिति"].astype(str).str.strip() == samman_f]
 
-    st.caption(f"कुल {len(filtered)} / {len(df)} केस")
-    st.dataframe(filtered, use_container_width=True, height=500)
+    st.caption(f"दिख रहे हैं: **{len(filtered)}** / कुल {len(df)} मुकदमे")
 
-    # Download filtered as Excel
-    buf = io.BytesIO()
+    # Show table
+    show_cols = ["ST NO", "मु0अ0स0", "धारा", "बनाम", "न्यायालय",
+                 "तलब साक्षी", "अगली तारीख पेशी", "Status", "सम्मन की स्थिति", "कृत कार्यवाही"]
+    st.dataframe(filtered[show_cols], use_container_width=True,
+                 hide_index=True, height=500)
+
+    # Download
+    buf = __import__('io').BytesIO()
     filtered.to_excel(buf, index=False)
     buf.seek(0)
-    st.download_button("⬇️ Filtered Excel डाउनलोड करें", buf,
-                       file_name="filtered_cases.xlsx",
+    st.download_button("⬇️ Excel डाउनलोड", buf, file_name="session_filtered.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
-# ══ Page 2: नया केस जोड़ें ════════════════════════════════════════════════════
-elif page == "➕ नया केस जोड़ें":
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. नया केस
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "➕ नया केस":
     st.header("➕ नया केस जोड़ें")
 
-    df = load_data()
-    if df.empty:
-        st.info("पहले Sheet URL डालें।")
-        st.stop()
-
-    cols = list(df.columns)
-    st.caption(f"Sheet के columns: {', '.join(cols)}")
-
-    with st.form("add_case_form"):
-        st.subheader("केस की जानकारी भरें")
-        field_values = {}
-        # 2 columns में form fields
-        half = len(cols) // 2 + len(cols) % 2
-        fc1, fc2 = st.columns(2)
-        for i, col in enumerate(cols):
-            with fc1 if i < half else fc2:
-                # Smart defaults
-                default = ""
-                if col == "अगली तारीख पेशी":
-                    default = datetime.today().strftime('%d/%m/%Y')
-                elif col == "न्यायालय":
-                    default = "ASJ"
-                field_values[col] = st.text_input(col, value=default, key=f"new_{col}")
+    with st.form("new_case"):
+        c1, c2 = st.columns(2)
+        with c1:
+            st_no    = st.text_input("ST NO *", placeholder="जैसे: 193/2025")
+            mu_apradh= st.text_input("मु0अ0स0", placeholder="जैसे: 691/2017")
+            dhara    = st.text_input("धारा", placeholder="जैसे: 8/20 NDPS ACT")
+            banam    = st.text_input("बनाम (अभियुक्त का नाम) *")
+            nyayalaya= st.selectbox("न्यायालय", gs.NYAYALAYA_OPTIONS)
+            status   = st.selectbox("Status", gs.STATUS_OPTIONS)
+        with c2:
+            saakshi  = st.text_area("तलब साक्षी (नाम पता)", height=80,
+                                     placeholder="BW / NBW prefix लगाएं अगर वारंट हो")
+            pichli   = st.text_input("पिछली पेशी (DD/MM/YYYY)")
+            agli     = st.text_input("अगली तारीख पेशी (DD/MM/YYYY) *")
+            samman_st= st.selectbox("सम्मन की स्थिति", gs.SAMMAN_OPTIONS)
+            kul_gawah= st.text_input("कुल गवाह", placeholder="जैसे: 5/2/3")
+            fir_date = st.text_input("FIR दिनांक")
+            krit_karya= st.text_input("कृत कार्यवाही")
 
         submitted = st.form_submit_button("✅ केस जोड़ें (Sheet में save होगा)",
                                           use_container_width=True, type="primary")
         if submitted:
-            st.no = field_values.get("ST NO", "")
-            if not st.no:
-                st.error("ST NO ज़रूरी है।")
+            if not st_no or not banam or not agli:
+                st.error("ST NO, बनाम और अगली तारीख पेशी ज़रूरी हैं।")
             else:
-                with st.spinner("Sheet में save हो रहा है..."):
-                    ws = st.session_state.ws_name or None
-                    ok = append_row(st.session_state.sheet_url, field_values, ws)
-                if ok:
-                    st.success(f"✅ केस जोड़ा गया! ST NO: {field_values.get('ST NO','')}")
-                    st.cache_data.clear()
-                else:
-                    st.error("Sheet में save नहीं हो सका।")
+                row = {
+                    "ST NO": st_no, "मु0अ0स0": mu_apradh, "धारा": dhara,
+                    "बनाम": banam, "न्यायालय": nyayalaya, "तलब साक्षी": saakshi,
+                    "पिछली पेशी": pichli, "अगली तारीख पेशी": agli,
+                    "Status": status, "सम्मन की स्थिति": samman_st,
+                    "कुल गवाह": kul_gawah, "Fir दिनांक": fir_date,
+                    "कृत कार्यवाही": krit_karya
+                }
+                if gs.append_row_session(row):
+                    st.success(f"✅ केस जोड़ा गया! ST NO: {st_no}")
 
 
-# ══ Page 3: समन जनरेटर ════════════════════════════════════════════════════════
-elif page == "🖨️ समन जनरेटर":
-    st.header("🖨️ समन / वारंट जनरेटर")
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. केस अपडेट
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "✏️ केस अपडेट":
+    st.header("✏️ केस अपडेट करें")
 
-    with st.expander("📋 तलब साक्षी column में prefix कैसे लिखें"):
-        st.markdown("""
-| prefix | document type |
-|---|---|
-| `रामलाल थाना xyz` | साधारण **समन** |
-| `BW रामलाल थाना xyz` | **जमानती वारंट (BW)** |
-| `NBW रामलाल थाना xyz` | **गैर जमानती वारंट (NBW)** |
-| `MRITYU कोई नहीं` | **मृत्यु आख्या** |
+    df = gs.load_session()
+    if df.empty:
+        st.warning("Data नहीं मिला।")
+        st.stop()
 
-एक row में कई साक्षी — comma से अलग करें।  
-VC लेटर के लिए Sheet में "VC" नाम की अलग sheet बनाएं।
-        """)
+    # Search
+    st_no_input = st.text_input("🔍 ST NO डालें", placeholder="जैसे: 193/2025")
 
-    st.divider()
-    source = st.radio("Data कहाँ से लें?",
-                      ["Google Sheet से (live)", "Excel file upload करें"],
-                      horizontal=True)
-
-    df_main = pd.DataFrame()
-    df_vc   = None
-
-    if source == "Google Sheet से (live)":
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            if st.button("🔄 Sheet से load करें", use_container_width=True):
-                st.cache_data.clear()
-        with col2:
-            if st.button("Refresh", use_container_width=True):
-                st.cache_data.clear()
-
-        df_main = load_data()
-        if not df_main.empty:
-            st.success(f"✅ {len(df_main)} rows मिली")
-            st.dataframe(df_main.head(5), use_container_width=True)
-
-    else:
-        uploaded = st.file_uploader("📂 Excel अपलोड करें (.xlsx)", type=["xlsx"])
-        if uploaded:
-            xls = pd.ExcelFile(io.BytesIO(uploaded.read()))
-            df_main = pd.read_excel(xls, sheet_name=0).fillna("")
-            if "VC" in xls.sheet_names:
-                df_vc = pd.read_excel(xls, sheet_name="VC").fillna("")
-            st.success(f"✅ {len(df_main)} rows मिली")
-            st.dataframe(df_main.head(5), use_container_width=True)
-
-    st.divider()
-
-    # Date filter for summon generation
-    if not df_main.empty and "अगली तारीख पेशी" in df_main.columns:
-        dates = ["सभी तारीखें"] + sorted(df_main["अगली तारीख पेशी"].unique().tolist())
-        sel_date = st.selectbox("किस तारीख के केस का समन बनाएं?", dates)
-        if sel_date != "सभी तारीखें":
-            df_main = df_main[df_main["अगली तारीख पेशी"] == sel_date]
-        st.caption(f"{len(df_main)} rows select हुईं")
-
-    if not df_main.empty:
-        if st.button("🖨️ सभी समन Generate करें", use_container_width=True, type="primary"):
-            from html_generator import generate_html
-            import re
-
-            def clean_col(name):
-                return re.sub(r'\s+', ' ', str(name)).strip()
-
-            df_main = df_main.rename(columns=clean_col)
-            if df_vc is not None:
-                df_vc = df_vc.rename(columns=clean_col)
-
-            with st.spinner("दस्तावेज़ बन रहे हैं..."):
-                try:
-                    html_content = generate_html(df_main, janpad, df_vc)
-                    st.success("✅ दस्तावेज़ तैयार! — HTML डाउनलोड करें, browser में खोलें, Ctrl+P → PDF save करें")
-                    st.download_button(
-                        "⬇️ समन_दस्तावेज़.html डाउनलोड करें",
-                        data=html_content.encode("utf-8"),
-                        file_name=f"समन_{datetime.today().strftime('%d-%m-%Y')}.html",
-                        mime="text/html",
-                        use_container_width=True,
-                    )
-                    # Live preview in app
-                    with st.expander("👁️ App में Preview देखें"):
-                        st.components.v1.html(html_content, height=600, scrolling=True)
-                except ValueError as ve:
-                    st.error(f"❌ Column मिसिंग: {ve}")
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
-    else:
-        st.info("ऊपर से data load करें।")
-
-
-# ══ Page 4: Column जोड़ें ═════════════════════════════════════════════════════
-elif page == "⚙️ Column जोड़ें":
-    st.header("⚙️ Sheet में नया Column जोड़ें")
-
-    df = load_data()
-    if not df.empty:
-        st.info(f"मौजूदा columns: **{', '.join(df.columns.tolist())}**")
-
-    st.divider()
-    new_col = st.text_input("नए column का नाम", placeholder="जैसे: वकील का नाम")
-
-    if st.button("➕ Column जोड़ें", type="primary", use_container_width=True):
-        if not new_col.strip():
-            st.error("Column नाम खाली नहीं हो सकता।")
+    case_row = None
+    if st_no_input:
+        match = df[df["ST NO"].astype(str).str.strip() == st_no_input.strip()]
+        if not match.empty:
+            case_row = match.iloc[0]
+            st.success(f"मिला: **राज्य बनाम {case_row['बनाम']}** | {case_row['न्यायालय']}")
         else:
-            ws = st.session_state.ws_name or None
-            result = add_column(st.session_state.sheet_url, new_col.strip(), ws)
-            if result == "exists":
-                st.warning(f"'{new_col}' पहले से मौजूद है।")
-            elif result:
-                st.success(f"✅ '{new_col}' column जोड़ा गया!")
-                st.cache_data.clear()
-            else:
-                st.error("Column नहीं जुड़ा। Permission check करें।")
+            st.error("ST NO नहीं मिला।")
+
+    if case_row is not None:
+        st.divider()
+        with st.form("update_case"):
+            c1, c2 = st.columns(2)
+            with c1:
+                new_status   = st.selectbox("Status", gs.STATUS_OPTIONS,
+                    index=gs.STATUS_OPTIONS.index(case_row["Status"]) if case_row["Status"] in gs.STATUS_OPTIONS else 0)
+                new_saakshi  = st.text_area("तलब साक्षी", value=case_row["तलब साक्षी"], height=80)
+                new_agli     = st.text_input("अगली तारीख पेशी", value=case_row["अगली तारीख पेशी"])
+                new_pichli   = st.text_input("पिछली पेशी", value=case_row["पिछली पेशी"])
+            with c2:
+                new_samman   = st.selectbox("सम्मन की स्थिति", gs.SAMMAN_OPTIONS,
+                    index=gs.SAMMAN_OPTIONS.index(case_row["सम्मन की स्थिति"]) if case_row["सम्मन की स्थिति"] in gs.SAMMAN_OPTIONS else 0)
+                new_krit     = st.text_input("कृत कार्यवाही", value=case_row["कृत कार्यवाही"])
+                new_gawah    = st.text_input("कुल गवाह", value=case_row["कुल गवाह"])
+                new_thana_date = st.text_input("थाने पर देने का दिनाँक", value=case_row["थाने पर देने का दिनाँक"])
+
+            save = st.form_submit_button("💾 अपडेट करें (Sheet में save होगा)",
+                                         use_container_width=True, type="primary")
+            if save:
+                updates = {
+                    "Status": new_status,
+                    "तलब साक्षी": new_saakshi,
+                    "अगली तारीख पेशी": new_agli,
+                    "पिछली पेशी": new_pichli,
+                    "सम्मन की स्थिति": new_samman,
+                    "कृत कार्यवाही": new_krit,
+                    "कुल गवाह": new_gawah,
+                    "थाने पर देने का दिनाँक": new_thana_date,
+                }
+                if gs.update_row_session(st_no_input.strip(), updates):
+                    st.success("✅ अपडेट हो गया!")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. समन जनरेटर
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "🖨️ समन जनरेटर":
+    st.header("🖨️ समन जनरेटर")
+    st.caption("सम्मन की स्थिति = **'बनाना है'** वाले cases का समन बनेगा")
+
+    df = gs.load_session()
+    if df.empty:
+        st.warning("Data नहीं मिला।")
+        st.stop()
+
+    pending = df[df["सम्मन की स्थिति"].astype(str).str.strip() == "बनाना है"]
+    st.info(f"**{len(pending)}** मुकदमों का समन बनना है")
+
+    if not pending.empty:
+        st.dataframe(
+            pending[["ST NO", "बनाम", "न्यायालय", "तलब साक्षी", "अगली तारीख पेशी"]],
+            use_container_width=True, hide_index=True
+        )
 
     st.divider()
-    st.caption("नोट: Column Sheet में सबसे अंत में जुड़ेगा, सभी rows में खाली रहेगा।")
 
+    # Date filter
+    dates = ["सभी"] + sorted(df["अगली तारीख पेशी"].astype(str).unique().tolist())
+    sel_date = st.selectbox("किस तारीख की पेशी का समन बनाएं?", dates)
+
+    gen_df = pending.copy()
+    if sel_date != "सभी":
+        gen_df = pending[pending["अगली तारीख पेशी"].astype(str).str.strip() == sel_date]
+    st.caption(f"{len(gen_df)} rows select")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        auto_update = st.checkbox("Generate के बाद status → 'ISSUED' करें", value=True)
+
+    if st.button("🖨️ समन Generate करें", type="primary",
+                 use_container_width=True, disabled=gen_df.empty):
+        html, st_nos = sg.generate_html(gen_df, JANPAD)
+        if html is None:
+            st.warning("कोई pending समन नहीं।")
+        else:
+            st.success(f"✅ {len(st_nos)} मुकदमों का समन तैयार!")
+            today = datetime.today().strftime('%d-%m-%Y')
+            st.download_button(
+                "⬇️ समन HTML डाउनलोड करें (Browser से Print/PDF करें)",
+                data=html.encode("utf-8"),
+                file_name=f"समन_{today}.html",
+                mime="text/html",
+                use_container_width=True,
+            )
+            st.info("📌 File download करें → Chrome में खोलें → Ctrl+P → Save as PDF → Landscape")
+
+            # Auto status update
+            if auto_update and st_nos:
+                with st.spinner("Status update हो रहा है..."):
+                    success_count = 0
+                    for st_no in st_nos:
+                        if gs.update_cell_session(st_no, "सम्मन की स्थिति", "ISSUED"):
+                            success_count += 1
+                    st.success(f"✅ {success_count} cases की status → ISSUED")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. DAK REGISTER
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📬 Dak Register":
+    st.header("📬 Dak Register")
+
+    tab1, tab2 = st.tabs(["📋 List / Update", "➕ नई Entry"])
+
+    with tab1:
+        df_d = gs.load_dak()
+        if df_d.empty:
+            st.info("कोई entry नहीं।")
+        else:
+            f1, f2 = st.columns(2)
+            with f1:
+                type_f = st.selectbox("Type", ["सभी"] + gs.DAK_TYPE_OPTIONS)
+            with f2:
+                status_f = st.selectbox("Status", ["सभी", "INCOMPLETE", "COMPLETE"])
+
+            filtered = df_d.copy()
+            if type_f != "सभी":
+                filtered = filtered[filtered["Type"] == type_f]
+            if status_f != "सभी":
+                filtered = filtered[filtered["status"] == status_f]
+
+            st.caption(f"{len(filtered)} entries")
+            st.dataframe(filtered, use_container_width=True,
+                         hide_index=True, height=400)
+
+            # Status update
+            st.divider()
+            st.subheader("✅ Status Update (INCOMPLETE → COMPLETE)")
+            row_num = st.number_input("Row number (1 = पहली data row)", min_value=1, step=1)
+            new_st = st.selectbox("नया Status", ["COMPLETE", "INCOMPLETE"])
+            if st.button("Status Update करें", type="primary"):
+                if gs.update_dak_status(int(row_num), new_st):
+                    st.success(f"Row {row_num} → {new_st}")
+
+    with tab2:
+        st.subheader("➕ नई Dak Entry")
+        with st.form("new_dak"):
+            c1, c2 = st.columns(2)
+            with c1:
+                stn      = st.text_input("STN (ST NO)", placeholder="जैसे: 193/2025")
+                banam    = st.text_input("बनाम")
+                dak_type = st.selectbox("Type", gs.DAK_TYPE_OPTIONS)
+                naam_pata= st.text_area("नाम पता", height=80)
+                thana    = st.text_input("संबंधित थाना", placeholder="जैसे: कोतवाली भिंगा जनपद श्रावस्ती")
+            with c2:
+                court    = st.text_input("कोर्ट का नाम", placeholder="जैसे: ASJ")
+                thane_date = st.text_input("थाने पर लाने का दिनांक (DD/MM/YYYY)")
+                peshi_date = st.text_input("तारीख़ पेशी (DD/MM/YYYY)")
+                remark   = st.text_input("रिमार्क")
+                link     = st.text_input("Google Drive Link (document)")
+
+            sub = st.form_submit_button("✅ Entry जोड़ें", use_container_width=True, type="primary")
+            if sub:
+                if not banam or not dak_type:
+                    st.error("बनाम और Type ज़रूरी हैं।")
+                else:
+                    row = {
+                        "STN": stn, "बनाम": banam, "status": "INCOMPLETE",
+                        "Type": dak_type, "नाम पता": naam_pata,
+                        "संबंधित थाना": thana, "कोर्ट का नाम": court,
+                        "थाने पर लाने का दिनांक": thane_date,
+                        "तारीख़ पेशी": peshi_date, "रिमार्क": remark, "लिंक": link
+                    }
+                    if gs.append_row_dak(row):
+                        st.success("✅ Dak entry जोड़ी गई!")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. RIMAND REGISTER
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "🔒 Rimand Register":
+    st.header("🔒 Rimand Register")
+
+    tab1, tab2 = st.tabs(["📋 List", "➕ नई Entry"])
+
+    with tab1:
+        df_r = gs.load_rimand()
+        if df_r.empty:
+            st.info("कोई रिमांड entry नहीं।")
+        else:
+            st.dataframe(df_r, use_container_width=True,
+                         hide_index=True, height=400)
+
+    with tab2:
+        st.subheader("➕ नई रिमांड Entry")
+        with st.form("new_rimand"):
+            c1, c2 = st.columns(2)
+            with c1:
+                rimand_date = st.text_input("रिमांड Date (DD/MM/YYYY)",
+                                             value=gs.today_str())
+                mu_apradh   = st.text_input("मु0अ0स0")
+                dhara       = st.text_input("धारा")
+            with c2:
+                court       = st.text_input("कोर्ट")
+                io_name     = st.text_input("IO (विवेचक)")
+                first_date  = st.text_input("First रिमांड डेट")
+                naam_pata   = st.text_area("नाम पता अभियुक्त", height=80)
+
+            sub = st.form_submit_button("✅ Entry जोड़ें",
+                                         use_container_width=True, type="primary")
+            if sub:
+                if not mu_apradh:
+                    st.error("मु0अ0स0 ज़रूरी है।")
+                else:
+                    row = {
+                        "रिमांड Date": rimand_date, "मु0अ0स0": mu_apradh,
+                        "धारा": dhara, "कोर्ट": court, "IO": io_name,
+                        "First रिमांड डेट": first_date,
+                        "नाम पता अभियुक्त": naam_pata
+                    }
+                    if gs.append_row_rimand(row):
+                        st.success("✅ रिमांड entry जोड़ी गई!")

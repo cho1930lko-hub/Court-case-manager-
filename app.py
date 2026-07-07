@@ -265,7 +265,7 @@ VC लेटर के लिए Sheet में "VC" नाम की अलग
 
     if not df_main.empty:
         if st.button("🖨️ सभी समन Generate करें", use_container_width=True, type="primary"):
-            from bulk_generator import generate_bulk
+            from html_generator import generate_html
             import re
 
             def clean_col(name):
@@ -277,15 +277,18 @@ VC लेटर के लिए Sheet में "VC" नाम की अलग
 
             with st.spinner("दस्तावेज़ बन रहे हैं..."):
                 try:
-                    docx_bytes = generate_bulk(df_main, janpad, df_vc)
-                    st.success("✅ दस्तावेज़ तैयार!")
+                    html_content = generate_html(df_main, janpad, df_vc)
+                    st.success("✅ दस्तावेज़ तैयार! — HTML डाउनलोड करें, browser में खोलें, Ctrl+P → PDF save करें")
                     st.download_button(
-                        "⬇️ समन_दस्तावेज़.docx डाउनलोड करें",
-                        data=docx_bytes,
-                        file_name=f"समन_{datetime.today().strftime('%d-%m-%Y')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "⬇️ समन_दस्तावेज़.html डाउनलोड करें",
+                        data=html_content.encode("utf-8"),
+                        file_name=f"समन_{datetime.today().strftime('%d-%m-%Y')}.html",
+                        mime="text/html",
                         use_container_width=True,
                     )
+                    # Live preview in app
+                    with st.expander("👁️ App में Preview देखें"):
+                        st.components.v1.html(html_content, height=600, scrolling=True)
                 except ValueError as ve:
                     st.error(f"❌ Column मिसिंग: {ve}")
                 except Exception as e:
@@ -321,3 +324,4 @@ elif page == "⚙️ Column जोड़ें":
 
     st.divider()
     st.caption("नोट: Column Sheet में सबसे अंत में जुड़ेगा, सभी rows में खाली रहेगा।")
+

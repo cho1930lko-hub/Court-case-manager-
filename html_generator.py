@@ -102,36 +102,38 @@ CSS = """
 
   .page {
     width: 277mm;
-    min-height: 190mm;
+    height: 190mm;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0;
     margin: 0 auto 8mm auto;
-    border: 1px solid #ccc;
+    border: 1px solid #aaa;
+    overflow: hidden;
   }
 
   .block {
-    padding: 6mm 5mm;
+    padding: 5mm 6mm;
     border-right: 1px solid #555;
     display: flex;
     flex-direction: column;
+    height: 190mm;
+    overflow: hidden;
   }
 
-  .block:last-child {
-    border-right: none;
-  }
+  .block:last-child { border-right: none; }
 
   .block-title {
     text-align: center;
     font-weight: bold;
-    font-size: 13pt;
+    font-size: 15pt;
     text-decoration: underline;
     margin-bottom: 2mm;
+    letter-spacing: 0.3px;
   }
 
   .block-court {
     text-align: center;
-    font-size: 11pt;
+    font-size: 12pt;
     font-weight: bold;
     margin-bottom: 3mm;
   }
@@ -141,64 +143,67 @@ CSS = """
   table.info {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 3mm;
-    font-size: 10pt;
+    margin-bottom: 3.5mm;
+    font-size: 11.5pt;
   }
 
   table.info td {
     border: 1px solid #444;
-    padding: 1.5mm 2mm;
-    vertical-align: top;
+    padding: 2mm 3mm;
+    vertical-align: middle;
   }
 
   table.info td.label {
     background: #f0f0f0;
     font-weight: bold;
-    width: 38%;
+    width: 36%;
     white-space: nowrap;
   }
 
   .witness-label {
     font-weight: bold;
-    font-size: 10pt;
+    font-size: 11pt;
     margin-top: 2mm;
+    margin-bottom: 1mm;
   }
 
   .witness-name {
     font-style: italic;
-    font-size: 11pt;
-    margin: 1mm 0 2mm 0;
-    line-height: 1.4;
+    font-size: 12pt;
+    margin-bottom: 3mm;
+    line-height: 1.45;
   }
 
   .body-text {
-    font-size: 10pt;
-    line-height: 1.5;
+    font-size: 11pt;
+    line-height: 1.6;
     text-align: justify;
-    margin-bottom: 2mm;
-    flex-grow: 1;
+    margin-bottom: 3mm;
   }
 
   .note {
-    font-size: 9.5pt;
+    font-size: 10.5pt;
     font-weight: bold;
     text-decoration: underline;
-    margin-bottom: 2mm;
+    margin-top: 1mm;
+    margin-bottom: 3mm;
   }
 
   .sign {
     text-align: right;
-    font-size: 10pt;
+    font-size: 11pt;
     margin-top: auto;
   }
+
   .sign-space {
-    height: 14mm;
+    height: 12mm;
     display: block;
   }
+
   .sign-lines div {
     margin: 0;
     padding: 0;
-    line-height: 1.25;
+    line-height: 1.3;
   }
 
   /* VC Letter */
@@ -268,7 +273,7 @@ def block_html(row_data, stype, janpad):
       </table>
       <div class="witness-label">{label}</div>
       <div class="witness-name">{witness}</div>
-      <div class="body-text">{BODY[stype]}</div>
+      <div class="body-text" style="flex-grow:1;">{BODY[stype]}</div>
       {note_html}
       <div class="sign">
         <span class="sign-space"></span>

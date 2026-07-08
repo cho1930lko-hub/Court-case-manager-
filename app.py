@@ -16,10 +16,95 @@ st.set_page_config(
 
 JANPAD = st.secrets.get("JANPAD", "श्रावस्ती")
 
+# ── Global CSS styling ────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Noto Sans Devanagari', 'Poppins', sans-serif !important;
+}
+
+.stApp {
+    background: linear-gradient(180deg, #f7f8fc 0%, #eef1f8 100%);
+}
+
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1e2a4a 0%, #17203a 100%);
+    color: #ffffff !important;
+}
+section[data-testid="stSidebar"] * {
+    color: #f0f2f8 !important;
+}
+section[data-testid="stSidebar"] .stRadio label {
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+    transition: background 0.15s ease;
+}
+section[data-testid="stSidebar"] .stRadio label:hover {
+    background: rgba(255,255,255,0.08);
+}
+section[data-testid="stSidebar"] .stButton button {
+    background: linear-gradient(135deg, #4f7cff, #2f56d6);
+    color: white !important;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+}
+section[data-testid="stSidebar"] .stButton button:hover {
+    background: linear-gradient(135deg, #5c86ff, #3862e0);
+}
+
+h1, h2, h3 {
+    font-weight: 700 !important;
+    color: #1e2a4a;
+}
+h1 { border-bottom: 3px solid #4f7cff; padding-bottom: 8px; }
+
+div[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #e6e9f2;
+    border-radius: 14px;
+    padding: 16px 18px 12px 18px;
+    box-shadow: 0 2px 10px rgba(30,42,74,0.06);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+div[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(30,42,74,0.12);
+}
+div[data-testid="stMetricLabel"] { color: #6b7594 !important; font-weight: 600; }
+div[data-testid="stMetricValue"] { color: #1e2a4a !important; font-weight: 700; }
+
+div[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e6e9f2;
+    box-shadow: 0 2px 8px rgba(30,42,74,0.05);
+}
+
+.stButton button, .stFormSubmitButton button {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+}
+.stButton button[kind="primary"], .stFormSubmitButton button[kind="primary"] {
+    background: linear-gradient(135deg, #4f7cff, #2f56d6) !important;
+    border: none !important;
+}
+
+div[data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+hr { border-color: #dfe3ee !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # ── Sidebar Navigation ────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## ⚖️ पैरवी रजिस्टर")
-    st.markdown(f"**भिंगा, जनपद {JANPAD}**")
+    st.markdown("### ⚖️ पैरवी रजिस्टर")
+    st.markdown(f"📍 **भिंगा, जनपद {JANPAD}**")
     st.divider()
 
     page = st.radio("", [

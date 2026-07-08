@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime
 import gsheet as gs
 import summon_gen as sg
+import karyawahi_gen as kg
 
 st.set_page_config(
     page_title="पैरवी रजिस्टर — भिंगा",
@@ -15,6 +16,7 @@ st.set_page_config(
 )
 
 JANPAD = st.secrets.get("JANPAD", "श्रावस्ती")
+THANA  = st.secrets.get("THANA", "कोतवाली भिंगा")
 
 # ── Global CSS styling ────────────────────────────────────────────────────────
 st.markdown("""
@@ -149,6 +151,7 @@ with st.sidebar:
         "➕ नया केस",
         "✏️ केस अपडेट",
         "🖨️ समन जनरेटर",
+        "📝 कृत कार्यवाही रिपोर्ट",
         "📬 Dak Register",
         "🔒 Rimand Register",
     ], label_visibility="collapsed")
@@ -481,6 +484,85 @@ elif page == "🖨️ समन जनरेटर":
                         if gs.update_cell_session(st_no, "सम्मन की स्थिति", "ISSUED"):
                             success_count += 1
                     st.success(f"✅ {success_count} cases की status → ISSUED")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5b. कृत कार्यवाही रिपोर्ट
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📝 कृत कार्यवाही रिपोर्ट":
+    st.header("📝 कृत कार्यवाही रिपोर्ट")
+    st.caption("किसी दिनांक या धारा (कलम) के आधार पर मुकदमों की कृत कार्यवाही की printable रिपोर्ट बनाएं")
+
+    df = gs.load_session()
+    if df.empty:
+        st.warning("Data नहीं मिला।")
+        st.stop()
+
+    mode = st.radio("किस आधार पर रिपोर्ट बनानी है?",
+                     ["📅 दिनांक (तारीख पेशी) से", "📖 धारा / कलम से"],
+                     horizontal=True)
+
+    filtered = pd.DataFrame()
+    sub_heading = ""
+
+    if mode == "📅 दिनांक (तारीख पेशी) से":
+        c1, c2 = st.columns(2)
+        with c1:
+            range_mode = st.checkbox("दिनांक रेंज चुनें (from - to)", value=False)
+        if range_mode:
+            c1, c2 = st.columns(2)
+            with c1:
+                from_date = st.date_input("से (From)")
+            with c2:
+                to_date = st.date_input("तक (To)")
+            from_s, to_s = from_date.strftime('%d/%m/%Y'), to_date.strftime('%d/%m/%Y')
+
+            def _in_range(v):
+                d = kg.parse_date(v)
+                return d is not None and from_date <= d.date() <= to_date.date()
+
+            filtered = df[df["अगली तारीख पेशी"].apply(_in_range)]
+            sub_heading = f"दिनांक: {from_s} से {to_s} तक"
+        else:
+            sel_date = st.date_input("तारीख पेशी चुनें")
+            sel_date_s = sel_date.strftime('%d/%m/%Y')
+            filtered = df[df["अगली तारीख पेशी"].apply(
+                lambda v: kg.fmt_date(v) == sel_date_s)]
+            sub_heading = f"दिनांक: {sel_date_s}"
+
+    else:  # धारा / कलम से
+        keyword = st.text_input("धारा / कलम खोजें", placeholder="जैसे: 323 या POCSO या NDPS")
+        if keyword:
+            filtered = df[df["धारा"].astype(str).str.contains(keyword, case=False, na=False)]
+            sub_heading = f"धारा / कलम: {keyword}"
+
+    if not filtered.empty:
+        st.caption(f"मिले: **{len(filtered)}** मुकदमे")
+        st.dataframe(
+            filtered[["ST NO", "मु0अ0स0", "धारा", "बनाम", "न्यायालय",
+                     "तलब साक्षी", "अगली तारीख पेशी", "कृत कार्यवाही"]],
+            use_container_width=True, hide_index=True
+        )
+        est_pages = "1 पेज" if len(filtered) <= 50 else ("~2 पेज" if len(filtered) <= 130 else "2+ पेज (filter और सीमित करें)")
+        st.caption(f"अनुमानित प्रिंट साइज़: {est_pages} (font अपने-आप छोटा होकर fit होगा)")
+
+        if st.button("📝 रिपोर्ट Generate करें", type="primary", use_container_width=True):
+            html = kg.generate_karyawahi_html(filtered, JANPAD, THANA, sub_heading)
+            if html is None:
+                st.warning("कोई data नहीं मिला।")
+            else:
+                st.success("✅ रिपोर्ट तैयार!")
+                today = datetime.today().strftime('%d-%m-%Y')
+                st.download_button(
+                    "⬇️ रिपोर्ट HTML डाउनलोड करें (Browser से Print/PDF करें)",
+                    data=html.encode("utf-8"),
+                    file_name=f"कृत_कार्यवाही_{today}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                )
+                st.info("📌 File download करें → Chrome में खोलें → Ctrl+P → Save as PDF → Landscape")
+    else:
+        st.info("ऊपर दिनांक या धारा चुनें, मिलान वाले मुकदमे यहां दिखेंगे।")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -101,6 +101,42 @@ hr { border-color: #dfe3ee !important; }
 </style>
 """, unsafe_allow_html=True)
 
+# ── Share helper ──────────────────────────────────────────────────────────────
+def build_share_text(row: dict) -> str:
+    """केस की row (dict) से एक साफ़-सुथरा शेयर करने योग्य text बनाता है"""
+    lines = [
+        f"⚖️ *केस विवरण — ST NO: {row.get('ST NO', '')}*",
+        "",
+        f"मु0अ0स0: {row.get('मु0अ0स0', '') or '-'}",
+        f"धारा: {row.get('धारा', '') or '-'}",
+        f"बनाम: {row.get('बनाम', '') or '-'}",
+        f"न्यायालय: {row.get('न्यायालय', '') or '-'}",
+        f"Status: {row.get('Status', '') or '-'}",
+        f"पिछली पेशी: {row.get('पिछली पेशी', '') or '-'}",
+        f"अगली तारीख पेशी: {row.get('अगली तारीख पेशी', '') or '-'}",
+        f"सम्मन की स्थिति: {row.get('सम्मन की स्थिति', '') or '-'}",
+    ]
+    saakshi = str(row.get('तलब साक्षी', '')).strip()
+    if saakshi:
+        lines += ["", f"तलब साक्षी:", saakshi]
+    krit = str(row.get('कृत कार्यवाही', '')).strip()
+    if krit:
+        lines += ["", f"कृत कार्यवाही: {krit}"]
+    lines += ["", f"📍 भिंगा, जनपद {JANPAD} — पैरवी रजिस्टर"]
+    return "\n".join(lines)
+
+
+def render_share_block(row: dict, key_prefix: str = ""):
+    """किसी भी page पर केस-शेयर UI (copy box + WhatsApp button) दिखाता है"""
+    share_text = build_share_text(row)
+    with st.expander("📤 यह केस शेयर करें", expanded=False):
+        st.code(share_text, language=None)
+        st.caption("ऊपर text-box के कोने में 📋 आइकॉन दबाकर copy करें, फिर कहीं भी paste कर दें।")
+        import urllib.parse
+        wa_url = "https://wa.me/?text=" + urllib.parse.quote(share_text)
+        st.link_button("🟢 WhatsApp पर शेयर करें", wa_url, use_container_width=True)
+
+
 # ── Sidebar Navigation ────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚖️ पैरवी रजिस्टर")
@@ -178,6 +214,40 @@ if page == "📊 Dashboard":
 
     st.divider()
 
+    # ── आने वाली पेशियां (अगले 7 दिन) ────────────────────────────────────────
+    st.subheader("🗓️ आने वाली पेशियां (अगले 7 दिन)")
+    from datetime import timedelta
+
+    def _parse_date(s):
+        s = str(s).strip()
+        for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(s, fmt)
+            except Exception:
+                pass
+        return None
+
+    today_dt = datetime.strptime(today_str, '%d/%m/%Y')
+    upcoming_rows = []
+    for _, r in df_s.iterrows():
+        d = _parse_date(r["अगली तारीख पेशी"])
+        if d and today_dt < d <= today_dt + timedelta(days=7):
+            upcoming_rows.append(r)
+
+    if not upcoming_rows:
+        st.info("अगले 7 दिन में कोई पेशी नहीं।")
+    else:
+        upcoming_df = pd.DataFrame(upcoming_rows).sort_values(
+            by="अगली तारीख पेशी",
+            key=lambda col: col.map(lambda x: _parse_date(x) or datetime.max)
+        )
+        st.dataframe(
+            upcoming_df[["ST NO", "बनाम", "न्यायालय", "Status", "अगली तारीख पेशी"]],
+            use_container_width=True, hide_index=True
+        )
+
+    st.divider()
+
     # ── Pending समन ──────────────────────────────────────────────────────────
     st.subheader("🖨️ समन बनाने हैं")
     pending = df_s[df_s["सम्मन की स्थिति"].astype(str).str.strip() == "बनाना है"]
@@ -238,6 +308,15 @@ elif page == "📋 सेशन कोर्ट":
     buf.seek(0)
     st.download_button("⬇️ Excel डाउनलोड", buf, file_name="session_filtered.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    # ── किसी एक केस को शेयर करें ────────────────────────────────────────────
+    st.divider()
+    st.subheader("📤 किसी एक केस को शेयर करें")
+    if not filtered.empty:
+        share_options = filtered["ST NO"].astype(str).tolist()
+        share_st_no = st.selectbox("ST NO चुनें", share_options, key="share_select")
+        share_row = filtered[filtered["ST NO"].astype(str) == share_st_no].iloc[0]
+        render_share_block(share_row.to_dict(), key_prefix="list")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -303,6 +382,7 @@ elif page == "✏️ केस अपडेट":
         if not match.empty:
             case_row = match.iloc[0]
             st.success(f"मिला: **राज्य बनाम {case_row['बनाम']}** | {case_row['न्यायालय']}")
+            render_share_block(case_row.to_dict())
         else:
             st.error("ST NO नहीं मिला।")
 

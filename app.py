@@ -18,6 +18,44 @@ st.set_page_config(
 JANPAD = st.secrets.get("JANPAD", "श्रावस्ती")
 THANA  = st.secrets.get("THANA", "कोतवाली भिंगा")
 
+# ── 🔒 Password Protection ───────────────────────────────────────────────────
+APP_PASSWORD = st.secrets.get("APP_PASSWORD", "")
+
+def _check_password():
+    if not APP_PASSWORD:
+        return True  # अगर secrets में APP_PASSWORD सेट नहीं है तो protection बंद रहेगी
+    if st.session_state.get("authenticated", False):
+        return True
+
+    st.markdown("""
+    <style>
+    .stApp { background: linear-gradient(180deg, #1e2a4a 0%, #17203a 100%); }
+    </style>
+    """, unsafe_allow_html=True)
+
+    _, col, _ = st.columns([1, 1.3, 1])
+    with col:
+        st.markdown(
+            "<h2 style='text-align:center; color:white; margin-top:15vh;'>"
+            "⚖️ पैरवी रजिस्टर</h2>", unsafe_allow_html=True
+        )
+        st.markdown(
+            f"<p style='text-align:center; color:#c8cfe0;'>भिंगा, जनपद {JANPAD}</p>",
+            unsafe_allow_html=True
+        )
+        pwd = st.text_input("Password डालें", type="password", label_visibility="collapsed",
+                            placeholder="🔑 Password डालें")
+        if st.button("लॉगिन करें", use_container_width=True, type="primary"):
+            if pwd == APP_PASSWORD:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("❌ गलत password।")
+    return False
+
+if not _check_password():
+    st.stop()
+
 # ── Global CSS styling ────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -160,6 +198,10 @@ with st.sidebar:
     if st.button("🔄 Data Refresh", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    if APP_PASSWORD:
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state["authenticated"] = False
+            st.rerun()
     st.caption(f"आज: {gs.today_str()}")
 
 
@@ -176,6 +218,28 @@ if page == "📊 Dashboard":
         st.warning("सेशन कोर्ट sheet से data नहीं मिला।")
         st.stop()
 
+    # ── 🔍 Global Quick Search ──────────────────────────────────────────────
+    search_q = st.text_input("🔍 Quick Search — ST NO या बनाम नाम टाइप करें",
+                              placeholder="जैसे: 193/2025 या रामकुमार")
+    if search_q:
+        search_res = df_s[
+            df_s["ST NO"].astype(str).str.contains(search_q, case=False, na=False) |
+            df_s["बनाम"].astype(str).str.contains(search_q, case=False, na=False)
+        ]
+        if search_res.empty:
+            st.info("कोई मुकदमा नहीं मिला।")
+        else:
+            st.caption(f"मिले: **{len(search_res)}** मुकदमे")
+            st.dataframe(
+                search_res[["ST NO", "बनाम", "न्यायालय", "Status", "अगली तारीख पेशी"]],
+                use_container_width=True, hide_index=True
+            )
+            sel_st = st.selectbox("शेयर के लिए ST NO चुनें", search_res["ST NO"].astype(str).tolist(),
+                                   key="dash_search_share")
+            render_share_block(search_res[search_res["ST NO"].astype(str) == sel_st].iloc[0].to_dict(),
+                               key_prefix="dashsearch")
+        st.divider()
+
     # ── Stats row ────────────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
 
@@ -191,6 +255,23 @@ if page == "📊 Dashboard":
     c3.metric("समन बनाने हैं", pending_samman, delta=f"बनाना है")
     c4.metric("Dak Pending", dak_incomplete)
     c5.metric("आज की पेशी", aaj_peshi)
+
+    # ── ⚠️ Overdue केस हाइलाइट ───────────────────────────────────────────────
+    today_dt_check = datetime.strptime(today_str, '%d/%m/%Y')
+
+    def _is_overdue(v):
+        d = kg.parse_date(v)
+        return d is not None and d < today_dt_check
+
+    overdue_df = df_s[df_s["अगली तारीख पेशी"].apply(_is_overdue)]
+    if not overdue_df.empty:
+        st.error(f"⚠️ **{len(overdue_df)} मुकदमों की तारीख पेशी निकल चुकी है** — status/अगली तारीख अपडेट करना बाकी है")
+        with st.expander("देखें कौन-कौन से मुकदमे", expanded=False):
+            st.dataframe(
+                overdue_df[["ST NO", "बनाम", "न्यायालय", "Status", "अगली तारीख पेशी"]]
+                .sort_values(by="अगली तारीख पेशी", key=lambda c: c.map(lambda x: kg.parse_date(x) or datetime.max)),
+                use_container_width=True, hide_index=True
+            )
 
     st.divider()
 
@@ -353,16 +434,27 @@ elif page == "➕ नया केस":
             if not st_no or not banam or not agli:
                 st.error("ST NO, बनाम और अगली तारीख पेशी ज़रूरी हैं।")
             else:
-                row = {
-                    "ST NO": st_no, "मु0अ0स0": mu_apradh, "धारा": dhara,
-                    "बनाम": banam, "न्यायालय": nyayalaya, "तलब साक्षी": saakshi,
-                    "पिछली पेशी": pichli, "अगली तारीख पेशी": agli,
-                    "Status": status, "सम्मन की स्थिति": samman_st,
-                    "कुल गवाह": kul_gawah, "Fir दिनांक": fir_date,
-                    "कृत कार्यवाही": krit_karya
-                }
-                if gs.append_row_session(row):
-                    st.success(f"✅ केस जोड़ा गया! ST NO: {st_no}")
+                existing_df = gs.load_session()
+                dup = existing_df[existing_df["ST NO"].astype(str).str.strip() == st_no.strip()]
+                if not dup.empty:
+                    dup_row = dup.iloc[0]
+                    st.error(
+                        f"⚠️ ST NO **{st_no}** पहले से मौजूद है! "
+                        f"(बनाम: {dup_row['बनाम']}, न्यायालय: {dup_row['न्यायालय']}, "
+                        f"Status: {dup_row['Status']}). कृपया ST NO चेक करें या "
+                        f"'केस अपडेट' पेज से मौजूदा केस को अपडेट करें।"
+                    )
+                else:
+                    row = {
+                        "ST NO": st_no, "मु0अ0स0": mu_apradh, "धारा": dhara,
+                        "बनाम": banam, "न्यायालय": nyayalaya, "तलब साक्षी": saakshi,
+                        "पिछली पेशी": pichli, "अगली तारीख पेशी": agli,
+                        "Status": status, "सम्मन की स्थिति": samman_st,
+                        "कुल गवाह": kul_gawah, "Fir दिनांक": fir_date,
+                        "कृत कार्यवाही": krit_karya
+                    }
+                    if gs.append_row_session(row):
+                        st.success(f"✅ केस जोड़ा गया! ST NO: {st_no}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

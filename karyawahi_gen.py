@@ -56,7 +56,13 @@ def _build_css(font_pt: float, pad_mm: float) -> str:
 * {{ margin:0; padding:0; box-sizing:border-box; }}
 body {{ font-family:'Noto Sans Devanagari','Mangal',Arial,sans-serif; background:#fff; color:#000; }}
 
-@page {{ size:A4 landscape; margin:8mm 7mm; }}
+@page {{
+  size:A4 landscape; margin:8mm 7mm 14mm 7mm;
+  @bottom-right {{
+    content: "Page " counter(page) " of " counter(pages);
+    font-size:9pt;
+  }}
+}}
 @media print {{
   body {{ margin:0; }}
   .no-print {{ display:none !important; }}
@@ -68,6 +74,10 @@ body {{ font-family:'Noto Sans Devanagari','Mangal',Arial,sans-serif; background
 }}
 .report-sub {{
   text-align:center; font-size:11pt; font-weight:600; margin-bottom:4mm;
+}}
+.report-footer {{
+  text-align:right; font-weight:600; font-size:11pt;
+  margin-top:8mm; padding-right:2mm;
 }}
 
 table.karya {{
@@ -135,13 +145,16 @@ def generate_karyawahi_html(df: pd.DataFrame, janpad: str, thana: str, sub_headi
 <html lang="hi">
 <head>
   <meta charset="UTF-8"/>
-  <title>कृत कार्यवाही रिपोर्ट — {today}</title>
+  <title>आज की कार्यवाही — {today}</title>
   {css}
 </head>
 <body>
   <button class="print-btn no-print" onclick="window.print()">🖨️ Print / PDF</button>
-  <div class="report-title">कृत कार्यवाही — थाना {thana}, जनपद {janpad}</div>
-  <div class="report-sub">{sub_heading} &nbsp;|&nbsp; रिपोर्ट बनाई गई: {today} &nbsp;|&nbsp; कुल मुकदमे: {len(rows)}</div>
+  <p class="no-print" style="text-align:center;font-size:10pt;color:#555;margin:0 0 4mm;">
+    📌 पेज नंबर ("Page 1 of 2") सही दिखने के लिए Print dialog में "Headers and footers" चालू रखें।
+  </p>
+  <div class="report-title">आज की कार्यवाही — थाना {thana}, जनपद {janpad}</div>
+  <div class="report-sub">{sub_heading} &nbsp;|&nbsp; कुल मुकदमे: {len(rows)}</div>
   <table class="karya">
     <thead>
       <tr>
@@ -154,6 +167,8 @@ def generate_karyawahi_html(df: pd.DataFrame, janpad: str, thana: str, sub_headi
       {"".join(trs)}
     </tbody>
   </table>
+  <div class="report-footer">आरक्षी मो शादाब, पैरोकार सेशन कोर्ट भिंगा</div>
 </body>
 </html>"""
     return html
+

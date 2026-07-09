@@ -184,6 +184,37 @@ hr { border-color: #dfe3ee !important; }
     word-break: break-word;
     line-height: 1.4;
 }
+
+/* Address Book cards */
+.addr-card {
+    background: #ffffff;
+    border: 1px solid #e6e9f2;
+    border-left: 4px solid #22a06b;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 4px rgba(30,42,74,0.06);
+}
+.addr-name {
+    font-weight: 700;
+    color: #1e2a4a;
+    font-size: 0.95rem;
+    margin-bottom: 3px;
+}
+.addr-dept, .addr-address {
+    font-size: 0.85rem;
+    color: #5b6478;
+    margin-bottom: 2px;
+    word-break: break-word;
+    line-height: 1.4;
+}
+.addr-mobile a.addr-call {
+    text-decoration: none;
+    color: #22a06b;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.addr-mobile a.addr-call:hover { text-decoration: underline; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -318,6 +349,39 @@ if page == "📊 Dashboard":
                 .sort_values(by="अगली तारीख पेशी", key=lambda c: c.map(lambda x: kg.parse_date(x) or datetime.max)),
                 use_container_width=True, hide_index=True
             )
+
+    st.divider()
+
+    # ── 📇 Address Book ──────────────────────────────────────────────────────
+    st.subheader("📇 Address Book")
+    df_addr = gs.load_address_book()
+    if df_addr.empty:
+        st.info("Address Book में कोई entry नहीं मिली (या 'Address Book' शीट नहीं मिली)।")
+    else:
+        addr_q = st.text_input("🔍 नाम / विभाग से खोजें", placeholder="जैसे: राम या पुलिस अधीक्षक",
+                               key="addr_search")
+        addr_view = df_addr
+        if addr_q:
+            addr_view = df_addr[
+                df_addr["नाम"].astype(str).str.contains(addr_q, case=False, na=False) |
+                df_addr["विभाग"].astype(str).str.contains(addr_q, case=False, na=False)
+            ]
+        if addr_view.empty:
+            st.info("कोई मिलान नहीं मिला।")
+        else:
+            st.caption(f"{len(addr_view)} entries")
+            addr_cards = []
+            for _, r in addr_view.iterrows():
+                mobile = str(r["मोबाइल"]).strip()
+                mobile_html = (f'<a class="addr-call" href="tel:{mobile}">📞 {mobile}</a>'
+                               if mobile else "—")
+                addr_cards.append(f"""<div class="addr-card">
+  <div class="addr-name">{r['नाम'] or '—'}</div>
+  <div class="addr-dept">🏢 {r['विभाग'] or '—'}</div>
+  <div class="addr-address">📍 {r['पता'] or '—'}</div>
+  <div class="addr-mobile">{mobile_html}</div>
+</div>""")
+            st.markdown("".join(addr_cards), unsafe_allow_html=True)
 
     st.divider()
 

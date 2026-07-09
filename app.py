@@ -5,6 +5,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import urllib.parse
 import gsheet as gs
 import summon_gen as sg
 import karyawahi_gen as kg
@@ -195,11 +196,17 @@ hr { border-color: #dfe3ee !important; }
     margin-bottom: 8px;
     box-shadow: 0 1px 4px rgba(30,42,74,0.06);
 }
+.addr-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+.addr-icon { font-size: 1rem; }
 .addr-name {
     font-weight: 700;
     color: #1e2a4a;
     font-size: 0.95rem;
-    margin-bottom: 3px;
 }
 .addr-dept, .addr-address {
     font-size: 0.85rem;
@@ -208,21 +215,39 @@ hr { border-color: #dfe3ee !important; }
     word-break: break-word;
     line-height: 1.4;
 }
-.addr-mobile a.addr-call {
-    text-decoration: none;
-    color: #22a06b;
-    font-weight: 600;
-    font-size: 0.85rem;
+.addr-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
 }
-.addr-mobile a.addr-call:hover { text-decoration: underline; }
+.addr-actions a {
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 8px;
+}
+.addr-call { background: #eef1f8; color: #4f7cff; }
+.addr-share { background: #e3f6ec; color: #1e9e5c; }
+.addr-actions a:hover { filter: brightness(0.95); }
 </style>
 """, unsafe_allow_html=True)
 
 # ── Share helper ──────────────────────────────────────────────────────────────
+def court_icon(nyayalaya: str) -> str:
+    """न्यायालय के प्रकार के हिसाब से अलग आइकॉन — सत्र/विशेष न्यायालय बनाम मजिस्ट्रेट कोर्ट"""
+    n = str(nyayalaya).upper()
+    if any(k in n for k in ["ASJ", "DJ", "POCSO", "SC/ST", "सत्र"]):
+        return "🏛️"
+    return "⚖️"
+
+
 def build_share_text(row: dict) -> str:
     """केस की row (dict) से एक साफ़-सुथरा शेयर करने योग्य text बनाता है"""
+    icon = court_icon(row.get("न्यायालय", ""))
     lines = [
-        f"⚖️ *केस विवरण — ST NO: {row.get('ST NO', '')}*",
+        f"{icon} *केस विवरण — ST NO: {row.get('ST NO', '')}*",
         "",
         f"मु0अ0स0: {row.get('मु0अ0स0', '') or '-'}",
         f"धारा: {row.get('धारा', '') or '-'}",
@@ -249,9 +274,37 @@ def render_share_block(row: dict, key_prefix: str = ""):
     with st.expander("📤 यह केस शेयर करें", expanded=False):
         st.code(share_text, language=None)
         st.caption("ऊपर text-box के कोने में 📋 आइकॉन दबाकर copy करें, फिर कहीं भी paste कर दें।")
-        import urllib.parse
         wa_url = "https://wa.me/?text=" + urllib.parse.quote(share_text)
         st.link_button("🟢 WhatsApp पर शेयर करें", wa_url, use_container_width=True)
+
+
+# ── Address Book share helper ────────────────────────────────────────────────
+DEPT_ICONS = [
+    ("पुलिस", "👮"), ("डॉक्टर", "🩺"), ("डाक्टर", "🩺"),
+    ("वकील", "⚖️"), ("कोर्ट", "🏛️"), ("नर्स", "💉"),
+]
+
+def dept_icon(dept: str) -> str:
+    """विभाग के हिसाब से अलग आइकॉन — पुलिस/डॉक्टर/वकील/आदि"""
+    d = str(dept).strip()
+    for key, icon in DEPT_ICONS:
+        if key in d:
+            return icon
+    return "📇"
+
+
+def build_addr_share_text(row: dict) -> str:
+    """Address Book की row से WhatsApp शेयर करने योग्य text बनाता है"""
+    icon = dept_icon(row.get("विभाग", ""))
+    lines = [
+        f"{icon} *{row.get('नाम', '') or '-'}*",
+        f"विभाग: {row.get('विभाग', '') or '-'}",
+        f"पता: {row.get('पता', '') or '-'}",
+        f"मोबाइल: {row.get('मोबाइल', '') or '-'}",
+        "",
+        f"📍 भिंगा, जनपद {JANPAD} — पैरवी रजिस्टर",
+    ]
+    return "\n".join(lines)
 
 
 # ── Sidebar Navigation ────────────────────────────────────────────────────────
@@ -290,6 +343,7 @@ if page == "📊 Dashboard":
 
     df_s = gs.load_session()
     df_d = gs.load_dak()
+    df_addr = gs.load_address_book()
 
     if df_s.empty:
         st.warning("सेशन कोर्ट sheet से data नहीं मिला।")
@@ -318,7 +372,7 @@ if page == "📊 Dashboard":
         st.divider()
 
     # ── Stats row ────────────────────────────────────────────────────────────
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     total   = len(df_s[df_s["ST NO"].astype(str).str.strip() != ""])
     sakshya = len(df_s[df_s["Status"] == "साक्ष्य"])
@@ -326,12 +380,14 @@ if page == "📊 Dashboard":
     dak_incomplete = len(df_d[df_d["status"].astype(str).str.strip() == "INCOMPLETE"])
     today_str = gs.today_str()
     aaj_peshi = len(df_s[df_s["अगली तारीख पेशी"].astype(str).str.strip() == today_str])
+    addr_total = len(df_addr[df_addr["नाम"].astype(str).str.strip() != ""])
 
     c1.metric("कुल मुकदमे", total)
     c2.metric("साक्ष्य stage", sakshya)
     c3.metric("समन बनाने हैं", pending_samman, delta=f"बनाना है")
     c4.metric("Dak Pending", dak_incomplete)
     c5.metric("आज की पेशी", aaj_peshi)
+    c6.metric("📇 Address Book", addr_total)
 
     # ── ⚠️ Overdue केस हाइलाइट ───────────────────────────────────────────────
     today_dt_check = datetime.strptime(today_str, '%d/%m/%Y')
@@ -353,35 +409,40 @@ if page == "📊 Dashboard":
     st.divider()
 
     # ── 📇 Address Book ──────────────────────────────────────────────────────
-    st.subheader("📇 Address Book")
-    df_addr = gs.load_address_book()
-    if df_addr.empty:
-        st.info("Address Book में कोई entry नहीं मिली (या 'Address Book' शीट नहीं मिली)।")
-    else:
-        addr_q = st.text_input("🔍 नाम / विभाग से खोजें", placeholder="जैसे: राम या पुलिस अधीक्षक",
-                               key="addr_search")
-        addr_view = df_addr
-        if addr_q:
-            addr_view = df_addr[
-                df_addr["नाम"].astype(str).str.contains(addr_q, case=False, na=False) |
-                df_addr["विभाग"].astype(str).str.contains(addr_q, case=False, na=False)
-            ]
-        if addr_view.empty:
-            st.info("कोई मिलान नहीं मिला।")
+    with st.expander(f"📇 Address Book खोलें / खोजें ({addr_total} entries)", expanded=False):
+        if df_addr.empty:
+            st.info("Address Book में कोई entry नहीं मिली (या 'Address Book' शीट नहीं मिली)।")
         else:
-            st.caption(f"{len(addr_view)} entries")
-            addr_cards = []
-            for _, r in addr_view.iterrows():
-                mobile = str(r["मोबाइल"]).strip()
-                mobile_html = (f'<a class="addr-call" href="tel:{mobile}">📞 {mobile}</a>'
-                               if mobile else "—")
-                addr_cards.append(f"""<div class="addr-card">
-  <div class="addr-name">{r['नाम'] or '—'}</div>
+            addr_q = st.text_input("🔍 नाम / विभाग से खोजें", placeholder="जैसे: राम या पुलिस अधीक्षक",
+                                   key="addr_search")
+            addr_view = df_addr
+            if addr_q:
+                addr_view = df_addr[
+                    df_addr["नाम"].astype(str).str.contains(addr_q, case=False, na=False) |
+                    df_addr["विभाग"].astype(str).str.contains(addr_q, case=False, na=False)
+                ]
+            if addr_view.empty:
+                st.info("कोई मिलान नहीं मिला।")
+            else:
+                st.caption(f"{len(addr_view)} entries")
+                addr_cards = []
+                for _, r in addr_view.iterrows():
+                    icon   = dept_icon(r["विभाग"])
+                    mobile = str(r["मोबाइल"]).strip()
+                    call_html = (f'<a class="addr-call" href="tel:{mobile}">📞 कॉल</a>'
+                                 if mobile else "")
+                    wa_url = "https://wa.me/?text=" + urllib.parse.quote(build_addr_share_text(r.to_dict()))
+                    share_html = f'<a class="addr-share" href="{wa_url}" target="_blank">🟢 शेयर</a>'
+                    addr_cards.append(f"""<div class="addr-card">
+  <div class="addr-card-top">
+    <span class="addr-icon">{icon}</span>
+    <span class="addr-name">{r['नाम'] or '—'}</span>
+  </div>
   <div class="addr-dept">🏢 {r['विभाग'] or '—'}</div>
   <div class="addr-address">📍 {r['पता'] or '—'}</div>
-  <div class="addr-mobile">{mobile_html}</div>
+  <div class="addr-actions">{call_html}{share_html}</div>
 </div>""")
-            st.markdown("".join(addr_cards), unsafe_allow_html=True)
+                st.markdown("".join(addr_cards), unsafe_allow_html=True)
 
     st.divider()
 
@@ -916,4 +977,3 @@ elif page == "🔒 Rimand Register":
                     }
                     if gs.append_row_rimand(row):
                         st.success("✅ रिमांड entry जोड़ी गई!")
-

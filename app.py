@@ -279,7 +279,8 @@ def render_share_block(row: dict, key_prefix: str = ""):
     with st.expander("📤 यह केस शेयर करें", expanded=False):
         st.code(share_text, language=None)
         st.caption("ऊपर text-box के कोने में 📋 आइकॉन दबाकर copy करें, फिर कहीं भी paste कर दें।")
-        wa_url = "https://wa.me/?text=" + urllib.parse.quote(share_text)
+        wa_text = f"```{share_text}```"   # ट्रिपल बैकटिक = WhatsApp monospace (colon align सही दिखेगा)
+        wa_url = "https://wa.me/?text=" + urllib.parse.quote(wa_text)
         st.link_button("🟢 WhatsApp पर शेयर करें", wa_url, use_container_width=True)
 
 
@@ -344,7 +345,8 @@ def render_rimand_share_block(row: dict, key_prefix: str = ""):
     with st.expander("📤 यह रिमांड एंट्री शेयर करें", expanded=False):
         st.code(share_text, language=None)
         st.caption("ऊपर text-box के कोने में 📋 आइकॉन दबाकर copy करें, फिर कहीं भी paste कर दें।")
-        wa_url = "https://wa.me/?text=" + urllib.parse.quote(share_text)
+        wa_text = f"```{share_text}```"
+        wa_url = "https://wa.me/?text=" + urllib.parse.quote(wa_text)
         st.link_button("🟢 WhatsApp पर शेयर करें", wa_url, use_container_width=True,
                         key=f"{key_prefix}_rimand_wa")
 
@@ -1039,4 +1041,3 @@ elif page == "🔒 Rimand Register":
                     }
                     if gs.append_row_rimand(row):
                         st.success("✅ रिमांड entry जोड़ी गई!")
-

@@ -244,27 +244,32 @@ def court_icon(nyayalaya: str) -> str:
 
 
 def build_share_text(row: dict) -> str:
-    """केस की row (dict) से एक साफ़-सुथरा शेयर करने योग्य text बनाता है"""
+    """केस की row (dict) से एक साफ़-सुथरा, emoji-आधारित शेयर करने योग्य text बनाता है"""
     icon = court_icon(row.get("न्यायालय", ""))
+    sep = "━━━━━━━━━━━━━━━━━━━━"
+
+    def line(emoji, label, value):
+        return f"{emoji} {label:<16}: {value or '-'}"
+
     lines = [
-        f"{icon} *केस विवरण — ST NO: {row.get('ST NO', '')}*",
+        f"{icon} पैरवी रिपोर्ट",
+        f"{THANA}, जनपद {JANPAD}",
+        sep,
         "",
-        f"मु0अ0स0: {row.get('मु0अ0स0', '') or '-'}",
-        f"धारा: {row.get('धारा', '') or '-'}",
-        f"बनाम: {row.get('बनाम', '') or '-'}",
-        f"न्यायालय: {row.get('न्यायालय', '') or '-'}",
-        f"Status: {row.get('Status', '') or '-'}",
-        f"पिछली पेशी: {row.get('पिछली पेशी', '') or '-'}",
-        f"अगली तारीख पेशी: {row.get('अगली तारीख पेशी', '') or '-'}",
-        f"सम्मन की स्थिति: {row.get('सम्मन की स्थिति', '') or '-'}",
+        line("📄", "एस०टी० नं०", row.get("ST NO", "")),
+        line("📑", "मु०अ०सं०", row.get("मु0अ0स0", "")),
+        line("⚖️", "धाराएँ", row.get("धारा", "")),
+        line("🏛️", "न्यायालय", row.get("न्यायालय", "")),
+        line("👥", "राज्य बनाम", row.get("बनाम", "")),
+        line("👤", "तलब साक्षी", row.get("तलब साक्षी", "")),
+        line("📅", "अगली पेशी", row.get("अगली तारीख पेशी", "")),
+        line("📌", "वाद की स्थिति", row.get("Status", "")),
+        line("🎯", "मॉनिटरिंग प्रकार", row.get("Type Of Moni", "")),
     ]
-    saakshi = str(row.get('तलब साक्षी', '')).strip()
-    if saakshi:
-        lines += ["", f"तलब साक्षी:", saakshi]
-    krit = str(row.get('कृत कार्यवाही', '')).strip()
+    krit = str(row.get("कृत कार्यवाही", "")).strip()
     if krit:
-        lines += ["", f"कृत कार्यवाही: {krit}"]
-    lines += ["", f"📍 भिंगा, जनपद {JANPAD} — पैरवी रजिस्टर"]
+        lines += ["", line("📝", "कृत कार्यवाही", krit)]
+    lines += ["", sep]
     return "\n".join(lines)
 
 
@@ -305,6 +310,43 @@ def build_addr_share_text(row: dict) -> str:
         f"📍 भिंगा, जनपद {JANPAD} — पैरवी रजिस्टर",
     ]
     return "\n".join(lines)
+
+
+# ── Rimand Register share helper ─────────────────────────────────────────────
+def build_rimand_share_text(row: dict) -> str:
+    """रिमांड रजिस्टर की row से emoji-आधारित शेयर करने योग्य text बनाता है"""
+    sep = "━━━━━━━━━━━━━━━━━━━━"
+
+    def line(emoji, label, value):
+        return f"{emoji} {label:<16}: {value or '-'}"
+
+    lines = [
+        "🔒 रिमांड रिपोर्ट",
+        f"{THANA}, जनपद {JANPAD}",
+        sep,
+        "",
+        line("📅", "रिमांड दिनांक", row.get("रिमांड Date", "")),
+        line("📑", "मु०अ०सं०", row.get("मु0अ0स0", "")),
+        line("⚖️", "धाराएँ", row.get("धारा", "")),
+        line("🏛️", "न्यायालय", row.get("कोर्ट", "")),
+        line("🕵️", "विवेचक (IO)", row.get("IO", "")),
+        line("📅", "प्रथम रिमांड डेट", row.get("First रिमांड डेट", "")),
+        line("👤", "अभियुक्त नाम पता", row.get("नाम पता अभियुक्त", "")),
+        "",
+        sep,
+    ]
+    return "\n".join(lines)
+
+
+def render_rimand_share_block(row: dict, key_prefix: str = ""):
+    """रिमांड entry के लिए शेयर UI (copy box + WhatsApp button) दिखाता है"""
+    share_text = build_rimand_share_text(row)
+    with st.expander("📤 यह रिमांड एंट्री शेयर करें", expanded=False):
+        st.code(share_text, language=None)
+        st.caption("ऊपर text-box के कोने में 📋 आइकॉन दबाकर copy करें, फिर कहीं भी paste कर दें।")
+        wa_url = "https://wa.me/?text=" + urllib.parse.quote(share_text)
+        st.link_button("🟢 WhatsApp पर शेयर करें", wa_url, use_container_width=True,
+                        key=f"{key_prefix}_rimand_wa")
 
 
 # ── Sidebar Navigation ────────────────────────────────────────────────────────
@@ -849,21 +891,31 @@ elif page == "📬 Dak Register":
         if df_d.empty:
             st.info("कोई entry नहीं।")
         else:
-            f1, f2 = st.columns(2)
+            f1, f2, f3 = st.columns(3)
             with f1:
                 type_f = st.selectbox("Type", ["सभी"] + gs.DAK_TYPE_OPTIONS)
             with f2:
                 status_f = st.selectbox("Status", ["सभी", "INCOMPLETE", "COMPLETE"])
+            with f3:
+                date_f = st.text_input("तारीख़ पेशी से filter (DD/MM/YYYY)",
+                                        placeholder="जैसे: 10/07/2026 या सिर्फ 07/2026")
 
             filtered = df_d.copy()
             if type_f != "सभी":
                 filtered = filtered[filtered["Type"] == type_f]
             if status_f != "सभी":
                 filtered = filtered[filtered["status"] == status_f]
+            if date_f:
+                filtered = filtered[filtered["तारीख़ पेशी"].astype(str)
+                                     .str.contains(date_f, case=False, na=False)]
 
             st.caption(f"{len(filtered)} entries")
-            st.dataframe(filtered, use_container_width=True,
-                         hide_index=True, height=400)
+            st.dataframe(
+                filtered, use_container_width=True, hide_index=True, height=400,
+                column_config={
+                    "लिंक": st.column_config.LinkColumn("लिंक", display_text="🔗 खोलें")
+                }
+            )
 
             # ── 📄 INCOMPLETE Dak को थाने भेजने के लिए HTML रिपोर्ट ───────────
             st.divider()
@@ -948,6 +1000,16 @@ elif page == "🔒 Rimand Register":
             st.dataframe(df_r, use_container_width=True,
                          hide_index=True, height=400)
 
+            st.divider()
+            st.subheader("📤 रिमांड एंट्री शेयर करें")
+            options = [
+                f"{i+1}. {r['मु0अ0स0'] or '—'} — {str(r['नाम पता अभियुक्त'])[:30] or '—'}"
+                for i, r in df_r.iterrows()
+            ]
+            sel = st.selectbox("शेयर के लिए Entry चुनें", options, key="rimand_share_sel")
+            sel_idx = options.index(sel)
+            render_rimand_share_block(df_r.iloc[sel_idx].to_dict(), key_prefix="rimandlist")
+
     with tab2:
         st.subheader("➕ नई रिमांड Entry")
         with st.form("new_rimand"):
@@ -977,3 +1039,4 @@ elif page == "🔒 Rimand Register":
                     }
                     if gs.append_row_rimand(row):
                         st.success("✅ रिमांड entry जोड़ी गई!")
+

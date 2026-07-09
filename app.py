@@ -8,6 +8,7 @@ from datetime import datetime
 import gsheet as gs
 import summon_gen as sg
 import karyawahi_gen as kg
+import dak_gen as dg
 
 st.set_page_config(
     page_title="पैरवी रजिस्टर — भिंगा",
@@ -138,6 +139,51 @@ div[data-testid="stAlert"] {
 }
 
 hr { border-color: #dfe3ee !important; }
+
+/* आज की पेशी — mobile-friendly cards (कोई column cut-off नहीं) */
+.case-card {
+    background: #ffffff;
+    border: 1px solid #e6e9f2;
+    border-left: 4px solid #4f7cff;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 4px rgba(30,42,74,0.06);
+}
+.case-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.case-st {
+    font-weight: 700;
+    color: #1e2a4a;
+    font-size: 0.95rem;
+}
+.case-status {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 10px;
+    background: #eef1f8;
+    color: #4f7cff;
+    white-space: nowrap;
+}
+.case-banam {
+    font-weight: 600;
+    color: #1e2a4a;
+    margin-bottom: 3px;
+    word-break: break-word;
+}
+.case-court, .case-witness {
+    font-size: 0.85rem;
+    color: #5b6478;
+    margin-bottom: 2px;
+    word-break: break-word;
+    line-height: 1.4;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -291,10 +337,18 @@ if page == "📊 Dashboard":
         if aaj.empty:
             st.info("आज कोई पेशी नहीं।")
         else:
-            st.dataframe(
-                aaj[["ST NO", "बनाम", "न्यायालय", "Status", "तलब साक्षी"]],
-                use_container_width=True, hide_index=True
-            )
+            cards = []
+            for _, r in aaj.iterrows():
+                cards.append(f"""<div class="case-card">
+  <div class="case-card-top">
+    <span class="case-st">ST NO: {r['ST NO']}</span>
+    <span class="case-status">{r['Status'] or '—'}</span>
+  </div>
+  <div class="case-banam">बनाम: {r['बनाम'] or '—'}</div>
+  <div class="case-court">🏛️ {r['न्यायालय'] or '—'}</div>
+  <div class="case-witness">👤 {r['तलब साक्षी'] or '—'}</div>
+</div>""")
+            st.markdown("".join(cards), unsafe_allow_html=True)
 
     st.divider()
 
@@ -686,6 +740,31 @@ elif page == "📬 Dak Register":
             st.dataframe(filtered, use_container_width=True,
                          hide_index=True, height=400)
 
+            # ── 📄 INCOMPLETE Dak को थाने भेजने के लिए HTML रिपोर्ट ───────────
+            st.divider()
+            st.subheader("📄 थाने भेजने हेतु HTML रिपोर्ट")
+            incomplete_df = filtered[filtered["status"].astype(str).str.strip() == "INCOMPLETE"]
+            if incomplete_df.empty:
+                st.success("✅ चुने हुए filter में कोई INCOMPLETE dak नहीं।")
+            else:
+                st.caption(f"**{len(incomplete_df)}** entries अभी INCOMPLETE हैं (ऊपर के filter अनुसार)")
+                if st.button("📄 INCOMPLETE Dak की HTML रिपोर्ट बनाएं",
+                             use_container_width=True, type="primary"):
+                    html = dg.generate_dak_html(incomplete_df, JANPAD, THANA, status="INCOMPLETE")
+                    if html is None:
+                        st.warning("कोई data नहीं मिला।")
+                    else:
+                        st.success("✅ रिपोर्ट तैयार!")
+                        today = datetime.today().strftime('%d-%m-%Y')
+                        st.download_button(
+                            "⬇️ रिपोर्ट HTML डाउनलोड करें (थाने भेजने के लिए Print/PDF करें)",
+                            data=html.encode("utf-8"),
+                            file_name=f"Dak_INCOMPLETE_{today}.html",
+                            mime="text/html",
+                            use_container_width=True,
+                        )
+                        st.info("📌 File download करें → Chrome में खोलें → Ctrl+P → Save as PDF → थाने भेजें")
+
             # Status update
             st.divider()
             st.subheader("✅ Status Update (INCOMPLETE → COMPLETE)")
@@ -773,3 +852,4 @@ elif page == "🔒 Rimand Register":
                     }
                     if gs.append_row_rimand(row):
                         st.success("✅ रिमांड entry जोड़ी गई!")
+

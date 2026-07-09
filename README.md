@@ -12,6 +12,7 @@
 | `सेशन कोर्ट` | मुकदमों की मुख्य लिस्ट (ST NO, धारा, बनाम, तलब साक्षी, Status आदि) |
 | `Dak REGISTER` | डाक की entries (साक्षी सम्मन, अभियुक्त सम्मन, मुसन्ना, तलबाना नोटिस) |
 | `RIMAND REGISTER` | रिमांड entries |
+| `Address Book` | संपर्क सूची — नाम, पता, मोबाइल, विभाग (Dashboard पर searchable दिखती है) |
 
 कनेक्शन `gsheet.py` में `gspread` + Google service account से होता है।
 
@@ -39,7 +40,7 @@ streamlit run app.py
 
 ## ऐप में क्या है
 
-- **📊 Dashboard** — कुल मुकदमे, साक्ष्य stage, pending समन, Dak pending, आज की पेशी — mobile-friendly cards में; overdue केस अलर्ट; आने वाली पेशियां (7 दिन)
+- **📊 Dashboard** — कुल मुकदमे, साक्ष्य stage, pending समन, Dak pending, आज की पेशी — mobile-friendly cards में; overdue केस अलर्ट; **📇 Address Book** (नाम/विभाग से search, tap-to-call मोबाइल नंबर); आने वाली पेशियां (7 दिन)
 - **📋 सेशन कोर्ट** — पूरी केस लिस्ट, search/filter (Status/न्यायालय/सम्मन स्थिति), Excel डाउनलोड, WhatsApp शेयर
 - **➕ नया केस / ✏️ केस अपडेट** — Google Sheet में सीधे row जोड़ना/अपडेट करना
 - **🖨️ समन जनरेटर** — "सम्मन की स्थिति = बनाना है" वाले cases से 4 तरह के दस्तावेज़ (समन साक्षी / BW / NBW / मृत्यु आख्या) का **HTML** बनाता है — A4 landscape, 2 दस्तावेज़/page, Print/PDF हेतु

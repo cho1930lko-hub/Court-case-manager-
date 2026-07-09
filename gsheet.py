@@ -13,6 +13,7 @@ from google.oauth2.service_account import Credentials
 SH_SESSION  = "सेशन कोर्ट"
 SH_DAK      = "Dak REGISTER"
 SH_RIMAND   = "RIMAND REGISTER"
+SH_ADDRESS  = "Address Book"
 
 # ── Column definitions ────────────────────────────────────────────────────────
 SESSION_COLS = [
@@ -34,6 +35,8 @@ RIMAND_COLS = [
     "रिमांड Date", "मु0अ0स0", "धारा", "कोर्ट",
     "IO", "First रिमांड डेट", "नाम पता अभियुक्त"
 ]
+
+ADDRESS_COLS = ["नाम", "पता", "मोबाइल", "विभाग"]
 
 STATUS_OPTIONS = [
     "साक्ष्य", "हाजिरी", "बहस", "313 सीआरपीसी",
@@ -116,6 +119,21 @@ def load_rimand() -> pd.DataFrame:
     except Exception as e:
         st.error(f"Rimand Register load error: {e}")
         return pd.DataFrame(columns=RIMAND_COLS)
+
+
+@st.cache_data(ttl=60)
+def load_address_book() -> pd.DataFrame:
+    try:
+        ws = get_sheet(SH_ADDRESS)
+        data = ws.get_all_records(default_blank="")
+        df = pd.DataFrame(data).fillna("")
+        for col in ADDRESS_COLS:
+            if col not in df.columns:
+                df[col] = ""
+        return df[ADDRESS_COLS]
+    except Exception as e:
+        st.error(f"Address Book sheet load error: {e}")
+        return pd.DataFrame(columns=ADDRESS_COLS)
 
 
 # ── Write helpers ─────────────────────────────────────────────────────────────

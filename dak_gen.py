@@ -128,4 +128,3 @@ def generate_dak_html(df: pd.DataFrame, janpad: str, thana: str,
 </body>
 </html>"""
     return html
-

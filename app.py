@@ -608,6 +608,19 @@ elif page == "📋 सेशन कोर्ट":
     with f4:
         samman_f = st.selectbox("सम्मन स्थिति", ["सभी"] + gs.SAMMAN_OPTIONS)
 
+    with st.expander("📅 पिछली / अगली पेशी की तारीख से Filter करें", expanded=False):
+        d1, d2 = st.columns(2)
+        with d1:
+            agli_range = st.date_input(
+                "अगली तारीख पेशी — रेंज चुनें (from - to)",
+                value=(), format="DD/MM/YYYY", key="agli_range_f"
+            )
+        with d2:
+            pichli_range = st.date_input(
+                "पिछली पेशी — रेंज चुनें (from - to)",
+                value=(), format="DD/MM/YYYY", key="pichli_range_f"
+            )
+
     # Apply filters
     filtered = df[df["ST NO"].astype(str).str.strip() != ""].copy()
     if search:
@@ -619,6 +632,17 @@ elif page == "📋 सेशन कोर्ट":
         filtered = filtered[filtered["न्यायालय"].str.contains(ny_f, na=False)]
     if samman_f != "सभी":
         filtered = filtered[filtered["सम्मन की स्थिति"].astype(str).str.strip() == samman_f]
+
+    def _in_range(date_str, rng):
+        d = parse_date_or_none(date_str)
+        if d is None:
+            return False
+        return rng[0] <= d <= rng[1]
+
+    if agli_range and len(agli_range) == 2:
+        filtered = filtered[filtered["अगली तारीख पेशी"].apply(lambda x: _in_range(x, agli_range))]
+    if pichli_range and len(pichli_range) == 2:
+        filtered = filtered[filtered["पिछली पेशी"].apply(lambda x: _in_range(x, pichli_range))]
 
     st.caption(f"दिख रहे हैं: **{len(filtered)}** / कुल {len(df)} मुकदमे")
 
@@ -950,7 +974,7 @@ elif page == "📬 Dak Register":
         if df_d.empty:
             st.info("कोई entry नहीं।")
         else:
-            f1, f2, f3 = st.columns(3)
+            f1, f2, f3, f4 = st.columns(4)
             with f1:
                 type_f = st.selectbox("Type", ["सभी"] + gs.DAK_TYPE_OPTIONS)
             with f2:
@@ -958,6 +982,9 @@ elif page == "📬 Dak Register":
             with f3:
                 date_f = st.text_input("तारीख़ पेशी से filter (DD/MM/YYYY)",
                                         placeholder="जैसे: 10/07/2026 या सिर्फ 07/2026")
+            with f4:
+                thane_date_f = st.text_input("थाने पर लाने का दिनांक से filter",
+                                              placeholder="जैसे: 10/07/2026 या सिर्फ 07/2026")
 
             filtered = df_d.copy()
             if type_f != "सभी":
@@ -967,6 +994,9 @@ elif page == "📬 Dak Register":
             if date_f:
                 filtered = filtered[filtered["तारीख़ पेशी"].astype(str)
                                      .str.contains(date_f, case=False, na=False)]
+            if thane_date_f:
+                filtered = filtered[filtered["थाने पर लाने का दिनांक"].astype(str)
+                                     .str.contains(thane_date_f, case=False, na=False)]
 
             st.caption(f"{len(filtered)} entries")
             st.dataframe(
@@ -1004,11 +1034,20 @@ elif page == "📬 Dak Register":
             # Status update
             st.divider()
             st.subheader("✅ Status Update (INCOMPLETE → COMPLETE)")
-            row_num = st.number_input("Row number (1 = पहली data row)", min_value=1, step=1)
-            new_st = st.selectbox("नया Status", ["COMPLETE", "INCOMPLETE"])
-            if st.button("Status Update करें", type="primary"):
-                if gs.update_dak_status(int(row_num), new_st):
-                    st.success(f"Row {row_num} → {new_st}")
+            if df_d.empty:
+                st.info("कोई entries नहीं।")
+            else:
+                upd_options = [
+                    f"{i+1}. {r['STN'] or '—'} — {r['बनाम'] or '—'} — {r['Type'] or '—'} (अभी: {r['status'] or '—'})"
+                    for i, r in df_d.iterrows()
+                ]
+                upd_sel = st.selectbox("Entry चुनें", upd_options, key="dak_status_sel")
+                upd_idx = upd_options.index(upd_sel)   # df_d में 0-based position
+                new_st = st.selectbox("नया Status", ["COMPLETE", "INCOMPLETE"], key="dak_status_new")
+                if st.button("Status Update करें", type="primary", use_container_width=True):
+                    if gs.update_dak_status(upd_idx + 1, new_st):
+                        st.success(f"✅ Status update हो गया → {new_st}")
+                        st.rerun()
 
     with tab2:
         st.subheader("➕ नई Dak Entry")
@@ -1098,4 +1137,3 @@ elif page == "🔒 Rimand Register":
                     }
                     if gs.append_row_rimand(row):
                         st.success("✅ रिमांड entry जोड़ी गई!")
-

@@ -234,6 +234,25 @@ hr { border-color: #dfe3ee !important; }
 </style>
 """, unsafe_allow_html=True)
 
+# ── Date helper (कैलेंडर picker ↔ DD/MM/YYYY string) ──────────────────────────
+def parse_date_or_none(s):
+    """DD/MM/YYYY (या अन्य आम format) string से Python date; ना पार्स हो तो None"""
+    s = str(s).strip()
+    if not s:
+        return None
+    for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except Exception:
+            pass
+    return None
+
+
+def date_to_str(d) -> str:
+    """date object को DD/MM/YYYY string में बदलता है (None → खाली string)"""
+    return d.strftime('%d/%m/%Y') if d else ""
+
+
 # ── Share helper ──────────────────────────────────────────────────────────────
 def court_icon(nyayalaya: str) -> str:
     """न्यायालय के प्रकार के हिसाब से अलग आइकॉन — सत्र/विशेष न्यायालय बनाम मजिस्ट्रेट कोर्ट"""
@@ -603,11 +622,46 @@ elif page == "📋 सेशन कोर्ट":
 
     st.caption(f"दिख रहे हैं: **{len(filtered)}** / कुल {len(df)} मुकदमे")
 
-    # Show table
+    # Show table — "अगली तारीख पेशी" पर टच करते ही कैलेंडर खुलेगा (inline edit)
     show_cols = ["ST NO", "मु0अ0स0", "धारा", "बनाम", "न्यायालय",
                  "तलब साक्षी", "अगली तारीख पेशी", "Status", "सम्मन की स्थिति", "कृत कार्यवाही"]
-    st.dataframe(filtered[show_cols], use_container_width=True,
-                 hide_index=True, height=500)
+    display_df = filtered[show_cols].copy()
+    display_df["अगली तारीख पेशी"] = display_df["अगली तारीख पेशी"].apply(parse_date_or_none)
+
+    edited_df = st.data_editor(
+        display_df,
+        use_container_width=True, hide_index=True, height=500,
+        key="session_list_editor",
+        column_config={
+            "ST NO": st.column_config.TextColumn("ST NO", disabled=True),
+            "मु0अ0स0": st.column_config.TextColumn(disabled=True),
+            "धारा": st.column_config.TextColumn(disabled=True),
+            "बनाम": st.column_config.TextColumn(disabled=True),
+            "न्यायालय": st.column_config.TextColumn(disabled=True),
+            "तलब साक्षी": st.column_config.TextColumn(disabled=True),
+            "अगली तारीख पेशी": st.column_config.DateColumn(
+                "अगली तारीख पेशी 📅", format="DD/MM/YYYY", step=1
+            ),
+            "Status": st.column_config.TextColumn(disabled=True),
+            "सम्मन की स्थिति": st.column_config.TextColumn(disabled=True),
+            "कृत कार्यवाही": st.column_config.TextColumn(disabled=True),
+        },
+    )
+    st.caption("📅 किसी भी केस की **अगली तारीख पेशी** पर टैप करें — कैलेंडर खुल जाएगा, नई तारीख चुनकर नीचे Save करें।")
+
+    changed_mask = edited_df["अगली तारीख पेशी"] != display_df["अगली तारीख पेशी"]
+    if changed_mask.any():
+        n_changed = int(changed_mask.sum())
+        st.warning(f"⚠️ {n_changed} केस की तारीख बदली गई है — अभी तक Google Sheet में save नहीं हुई।")
+        if st.button(f"💾 {n_changed} बदली गई तारीखें Save करें", type="primary", use_container_width=True):
+            ok_count = 0
+            for idx in edited_df[changed_mask].index:
+                st_no_val = str(edited_df.loc[idx, "ST NO"])
+                new_date_str = date_to_str(edited_df.loc[idx, "अगली तारीख पेशी"])
+                if gs.update_cell_session(st_no_val, "अगली तारीख पेशी", new_date_str):
+                    ok_count += 1
+            st.success(f"✅ {ok_count} तारीखें Save हो गईं!")
+            st.rerun()
 
     # Download
     buf = __import__('io').BytesIO()
@@ -644,17 +698,17 @@ elif page == "➕ नया केस":
         with c2:
             saakshi  = st.text_area("तलब साक्षी (नाम पता)", height=80,
                                      placeholder="BW / NBW prefix लगाएं अगर वारंट हो")
-            pichli   = st.text_input("पिछली पेशी (DD/MM/YYYY)")
-            agli     = st.text_input("अगली तारीख पेशी (DD/MM/YYYY) *")
+            pichli_d = st.date_input("पिछली पेशी 📅", value=None, format="DD/MM/YYYY")
+            agli_d   = st.date_input("अगली तारीख पेशी 📅 *", value=None, format="DD/MM/YYYY")
             samman_st= st.selectbox("सम्मन की स्थिति", gs.SAMMAN_OPTIONS)
             kul_gawah= st.text_input("कुल गवाह", placeholder="जैसे: 5/2/3")
-            fir_date = st.text_input("FIR दिनांक")
+            fir_date_d = st.date_input("FIR दिनांक 📅", value=None, format="DD/MM/YYYY")
             krit_karya= st.text_input("कृत कार्यवाही")
 
         submitted = st.form_submit_button("✅ केस जोड़ें (Sheet में save होगा)",
                                           use_container_width=True, type="primary")
         if submitted:
-            if not st_no or not banam or not agli:
+            if not st_no or not banam or not agli_d:
                 st.error("ST NO, बनाम और अगली तारीख पेशी ज़रूरी हैं।")
             else:
                 existing_df = gs.load_session()
@@ -671,9 +725,9 @@ elif page == "➕ नया केस":
                     row = {
                         "ST NO": st_no, "मु0अ0स0": mu_apradh, "धारा": dhara,
                         "बनाम": banam, "न्यायालय": nyayalaya, "तलब साक्षी": saakshi,
-                        "पिछली पेशी": pichli, "अगली तारीख पेशी": agli,
+                        "पिछली पेशी": date_to_str(pichli_d), "अगली तारीख पेशी": date_to_str(agli_d),
                         "Status": status, "सम्मन की स्थिति": samman_st,
-                        "कुल गवाह": kul_gawah, "Fir दिनांक": fir_date,
+                        "कुल गवाह": kul_gawah, "Fir दिनांक": date_to_str(fir_date_d),
                         "कृत कार्यवाही": krit_karya
                     }
                     if gs.append_row_session(row):
@@ -712,14 +766,17 @@ elif page == "✏️ केस अपडेट":
                 new_status   = st.selectbox("Status", gs.STATUS_OPTIONS,
                     index=gs.STATUS_OPTIONS.index(case_row["Status"]) if case_row["Status"] in gs.STATUS_OPTIONS else 0)
                 new_saakshi  = st.text_area("तलब साक्षी", value=case_row["तलब साक्षी"], height=80)
-                new_agli     = st.text_input("अगली तारीख पेशी", value=case_row["अगली तारीख पेशी"])
-                new_pichli   = st.text_input("पिछली पेशी", value=case_row["पिछली पेशी"])
+                new_agli_d   = st.date_input("अगली तारीख पेशी 📅",
+                    value=parse_date_or_none(case_row["अगली तारीख पेशी"]), format="DD/MM/YYYY")
+                new_pichli_d = st.date_input("पिछली पेशी 📅",
+                    value=parse_date_or_none(case_row["पिछली पेशी"]), format="DD/MM/YYYY")
             with c2:
                 new_samman   = st.selectbox("सम्मन की स्थिति", gs.SAMMAN_OPTIONS,
                     index=gs.SAMMAN_OPTIONS.index(case_row["सम्मन की स्थिति"]) if case_row["सम्मन की स्थिति"] in gs.SAMMAN_OPTIONS else 0)
                 new_krit     = st.text_input("कृत कार्यवाही", value=case_row["कृत कार्यवाही"])
                 new_gawah    = st.text_input("कुल गवाह", value=case_row["कुल गवाह"])
-                new_thana_date = st.text_input("थाने पर देने का दिनाँक", value=case_row["थाने पर देने का दिनाँक"])
+                new_thana_date_d = st.date_input("थाने पर देने का दिनाँक 📅",
+                    value=parse_date_or_none(case_row["थाने पर देने का दिनाँक"]), format="DD/MM/YYYY")
 
             save = st.form_submit_button("💾 अपडेट करें (Sheet में save होगा)",
                                          use_container_width=True, type="primary")
@@ -727,12 +784,12 @@ elif page == "✏️ केस अपडेट":
                 updates = {
                     "Status": new_status,
                     "तलब साक्षी": new_saakshi,
-                    "अगली तारीख पेशी": new_agli,
-                    "पिछली पेशी": new_pichli,
+                    "अगली तारीख पेशी": date_to_str(new_agli_d),
+                    "पिछली पेशी": date_to_str(new_pichli_d),
                     "सम्मन की स्थिति": new_samman,
                     "कृत कार्यवाही": new_krit,
                     "कुल गवाह": new_gawah,
-                    "थाने पर देने का दिनाँक": new_thana_date,
+                    "थाने पर देने का दिनाँक": date_to_str(new_thana_date_d),
                 }
                 if gs.update_row_session(st_no_input.strip(), updates):
                     st.success("✅ अपडेट हो गया!")
@@ -965,8 +1022,8 @@ elif page == "📬 Dak Register":
                 thana    = st.text_input("संबंधित थाना", placeholder="जैसे: कोतवाली भिंगा जनपद श्रावस्ती")
             with c2:
                 court    = st.text_input("कोर्ट का नाम", placeholder="जैसे: ASJ")
-                thane_date = st.text_input("थाने पर लाने का दिनांक (DD/MM/YYYY)")
-                peshi_date = st.text_input("तारीख़ पेशी (DD/MM/YYYY)")
+                thane_date_d = st.date_input("थाने पर लाने का दिनांक 📅", value=None, format="DD/MM/YYYY")
+                peshi_date_d = st.date_input("तारीख़ पेशी 📅", value=None, format="DD/MM/YYYY")
                 remark   = st.text_input("रिमार्क")
                 link     = st.text_input("Google Drive Link (document)")
 
@@ -979,8 +1036,8 @@ elif page == "📬 Dak Register":
                         "STN": stn, "बनाम": banam, "status": "INCOMPLETE",
                         "Type": dak_type, "नाम पता": naam_pata,
                         "संबंधित थाना": thana, "कोर्ट का नाम": court,
-                        "थाने पर लाने का दिनांक": thane_date,
-                        "तारीख़ पेशी": peshi_date, "रिमार्क": remark, "लिंक": link
+                        "थाने पर लाने का दिनांक": date_to_str(thane_date_d),
+                        "तारीख़ पेशी": date_to_str(peshi_date_d), "रिमार्क": remark, "लिंक": link
                     }
                     if gs.append_row_dak(row):
                         st.success("✅ Dak entry जोड़ी गई!")
@@ -1017,14 +1074,14 @@ elif page == "🔒 Rimand Register":
         with st.form("new_rimand"):
             c1, c2 = st.columns(2)
             with c1:
-                rimand_date = st.text_input("रिमांड Date (DD/MM/YYYY)",
-                                             value=gs.today_str())
+                rimand_date_d = st.date_input("रिमांड Date 📅",
+                                               value=datetime.today().date(), format="DD/MM/YYYY")
                 mu_apradh   = st.text_input("मु0अ0स0")
                 dhara       = st.text_input("धारा")
             with c2:
                 court       = st.text_input("कोर्ट")
                 io_name     = st.text_input("IO (विवेचक)")
-                first_date  = st.text_input("First रिमांड डेट")
+                first_date_d = st.date_input("First रिमांड डेट 📅", value=None, format="DD/MM/YYYY")
                 naam_pata   = st.text_area("नाम पता अभियुक्त", height=80)
 
             sub = st.form_submit_button("✅ Entry जोड़ें",
@@ -1034,10 +1091,11 @@ elif page == "🔒 Rimand Register":
                     st.error("मु0अ0स0 ज़रूरी है।")
                 else:
                     row = {
-                        "रिमांड Date": rimand_date, "मु0अ0स0": mu_apradh,
+                        "रिमांड Date": date_to_str(rimand_date_d), "मु0अ0स0": mu_apradh,
                         "धारा": dhara, "कोर्ट": court, "IO": io_name,
-                        "First रिमांड डेट": first_date,
+                        "First रिमांड डेट": date_to_str(first_date_d),
                         "नाम पता अभियुक्त": naam_pata
                     }
                     if gs.append_row_rimand(row):
                         st.success("✅ रिमांड entry जोड़ी गई!")
+

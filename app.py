@@ -434,9 +434,7 @@ if page == "📊 Dashboard":
                                key_prefix="dashsearch")
         st.divider()
 
-    # ── Stats row ────────────────────────────────────────────────────────────
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-
+    # ── Stats: compact 2-column layout, easier to read on mobile ─────────────
     total   = len(df_s[df_s["ST NO"].astype(str).str.strip() != ""])
     sakshya = len(df_s[df_s["Status"] == "साक्ष्य"])
     pending_samman = len(df_s[df_s["सम्मन की स्थिति"].astype(str).str.strip() == "बनाना है"])
@@ -445,12 +443,17 @@ if page == "📊 Dashboard":
     aaj_peshi = len(df_s[df_s["अगली तारीख पेशी"].astype(str).str.strip() == today_str])
     addr_total = len(df_addr[df_addr["नाम"].astype(str).str.strip() != ""])
 
-    c1.metric("कुल मुकदमे", total)
-    c2.metric("साक्ष्य stage", sakshya)
-    c3.metric("समन बनाने हैं", pending_samman, delta=f"बनाना है")
-    c4.metric("Dak Pending", dak_incomplete)
-    c5.metric("आज की पेशी", aaj_peshi)
-    c6.metric("📇 Address Book", addr_total)
+    metric_rows = [
+        (("कुल मुकदमे", total), ("आज की पेशी", aaj_peshi)),
+        (("समन बनाने हैं", pending_samman), ("साक्ष्य stage", sakshya)),
+        (("Dak Pending", dak_incomplete), ("📇 Address Book", addr_total)),
+    ]
+    for left_metric, right_metric in metric_rows:
+        left_col, right_col = st.columns(2)
+        with left_col:
+            st.metric(left_metric[0], left_metric[1])
+        with right_col:
+            st.metric(right_metric[0], right_metric[1])
 
     # ── ⚠️ Overdue केस हाइलाइट ───────────────────────────────────────────────
     today_dt_check = datetime.strptime(today_str, '%d/%m/%Y')

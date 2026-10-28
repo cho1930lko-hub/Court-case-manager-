@@ -433,23 +433,33 @@ with st.sidebar:
 # 1. DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "📊 Dashboard":
-    st.header("📊 पैरवी Dashboard")
-    st.caption(f"📍 {THANA}, जनपद {JANPAD}  ·  आज: {gs.today_str()}")
+    st.header("⚖️ पैरवी रजिस्टर")
+    st.caption(f"{THANA}, जनपद {JANPAD}  |  दिनांक: {gs.today_str()}")
 
-    # Quick actions: directly open frequently used modules
-    st.subheader("⚡ त्वरित कार्य")
-    quick_actions = st.columns(2)
+    # Home shortcuts: रोज़ के काम सीधे खोलने के लिए
+    st.subheader("त्वरित पहुँच")
     quick_action_items = [
-        ("➕ नया केस जोड़ें", "➕ नया केस"),
-        ("📋 केस लिस्ट खोलें", "📋 सेशन कोर्ट"),
-        ("🖨️ समन जनरेटर", "🖨️ समन जनरेटर"),
+        ("📅 आज की पेशी", "आज"),
+        ("🔎 केस खोजें", "खोज"),
+        ("➕ नया केस", "➕ नया केस"),
+        ("🖨️ समन बनाएं", "🖨️ समन जनरेटर"),
         ("📬 Dak Register", "📬 Dak Register"),
+        ("🔒 Rimand Register", "🔒 Rimand Register"),
     ]
-    for action_idx, (action_label, target_page) in enumerate(quick_action_items):
-        with quick_actions[action_idx % 2]:
-            if st.button(action_label, key=f"quick_action_{action_idx}", use_container_width=True):
-                st.session_state["page_nav"] = target_page
-                st.rerun()
+    for row_start in range(0, len(quick_action_items), 2):
+        action_cols = st.columns(2)
+        for col_idx, (action_label, target) in enumerate(quick_action_items[row_start:row_start + 2]):
+            with action_cols[col_idx]:
+                if st.button(action_label, key=f"home_action_{row_start + col_idx}", use_container_width=True):
+                    if target == "आज":
+                        st.session_state["session_quick_filter"] = "today"
+                        st.session_state["page_nav"] = "📋 सेशन कोर्ट"
+                    elif target == "खोज":
+                        st.session_state["session_quick_filter"] = "search"
+                        st.session_state["page_nav"] = "📋 सेशन कोर्ट"
+                    else:
+                        st.session_state["page_nav"] = target
+                    st.rerun()
 
     st.divider()
     df_s = gs.load_session()
@@ -647,6 +657,12 @@ elif page == "📋 सेशन कोर्ट":
         st.info("अभी केस डेटा उपलब्ध नहीं है। नीचे केस-लिस्ट का UI खुला रहेगा; डेटा जुड़ने पर केस यहाँ दिखेंगे।")
 
     # ── Filters ──────────────────────────────────────────────────────────────
+    quick_filter = st.session_state.pop("session_quick_filter", "")
+    if quick_filter == "today":
+        st.info(f"आज की पेशियों की सूची — {gs.today_str()}")
+    elif quick_filter == "search":
+        st.info("नाम, ST NO या धारा लिखकर केस खोजें।")
+
     f1, f2, f3, f4 = st.columns(4)
     with f1:
         search = st.text_input("🔍 खोजें", placeholder="नाम / ST NO / धारा")
@@ -672,6 +688,11 @@ elif page == "📋 सेशन कोर्ट":
 
     # Apply filters
     filtered = df[df["ST NO"].astype(str).str.strip() != ""].copy()
+    if quick_filter == "today":
+        today_date = parse_date_or_none(gs.today_str())
+        filtered = filtered[filtered["अगली तारीख पेशी"].apply(
+            lambda value: parse_date_or_none(value) == today_date
+        )]
     if search:
         mask = filtered.apply(lambda r: search.lower() in " ".join(r.astype(str)).lower(), axis=1)
         filtered = filtered[mask]

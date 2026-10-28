@@ -912,8 +912,16 @@ elif page == "✏️ केस अपडेट":
         st.warning("Data नहीं मिला।")
         st.stop()
 
-    # Search
-    st_no_input = st.text_input("🔍 ST NO डालें", placeholder="जैसे: 193/2025")
+    # Search (कार्ड के एक्शन मेनू से आने पर ST NO पहले से भरा रहेगा)
+    suggested_st_no = st.session_state.get("case_update_st_no", "")
+    st_no_input = st.text_input(
+        "🔍 ST NO डालें",
+        value=suggested_st_no,
+        placeholder="जैसे: 193/2025",
+        key="case_update_search_input"
+    )
+    if suggested_st_no and st_no_input == suggested_st_no:
+        st.session_state.pop("case_update_st_no", None)
 
     case_row = None
     if st_no_input:

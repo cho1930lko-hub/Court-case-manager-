@@ -231,6 +231,36 @@ hr { border-color: #dfe3ee !important; }
 .addr-call { background: #eef1f8; color: #4f7cff; }
 .addr-share { background: #e3f6ec; color: #1e9e5c; }
 .addr-actions a:hover { filter: brightness(0.95); }
+
+/* Responsive layout: Streamlit desktop UI should remain comfortable on phones */
+@media (max-width: 768px) {
+    .block-container {
+        padding-left: 0.85rem !important;
+        padding-right: 0.85rem !important;
+        padding-top: 1rem !important;
+        max-width: 100% !important;
+    }
+    h1 { font-size: 1.55rem !important; line-height: 1.35 !important; }
+    h2 { font-size: 1.3rem !important; line-height: 1.35 !important; }
+    h3 { font-size: 1.08rem !important; line-height: 1.4 !important; }
+    div[data-testid="stMetric"] {
+        padding: 12px 12px 10px !important;
+        border-radius: 12px !important;
+        min-width: 0 !important;
+    }
+    div[data-testid="stMetricLabel"] { font-size: 0.78rem !important; }
+    div[data-testid="stMetricValue"] { font-size: 1.45rem !important; }
+    .stButton button, .stFormSubmitButton button, div[data-testid="stDownloadButton"] button {
+        min-height: 2.75rem !important;
+        white-space: normal !important;
+    }
+    div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {
+        max-width: 100% !important;
+    }
+    section[data-testid="stSidebar"] {
+        min-width: 0 !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -409,8 +439,7 @@ if page == "📊 Dashboard":
     df_addr = gs.load_address_book()
 
     if df_s.empty:
-        st.warning("सेशन कोर्ट sheet से data नहीं मिला।")
-        st.stop()
+        st.info("अभी Google Sheet में केस डेटा उपलब्ध नहीं है। Dashboard का UI preview खाली डेटा के साथ दिखाया जा रहा है।")
 
     # ── 🔍 Global Quick Search ──────────────────────────────────────────────
     search_q = st.text_input("🔍 Quick Search — ST NO या बनाम नाम टाइप करें",
@@ -597,8 +626,7 @@ elif page == "📋 सेशन कोर्ट":
 
     df = gs.load_session()
     if df.empty:
-        st.warning("Data नहीं मिला।")
-        st.stop()
+        st.info("अभी केस डेटा उपलब्ध नहीं है। नीचे केस-लिस्ट का UI खुला रहेगा; डेटा जुड़ने पर केस यहाँ दिखेंगे।")
 
     # ── Filters ──────────────────────────────────────────────────────────────
     f1, f2, f3, f4 = st.columns(4)

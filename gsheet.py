@@ -8,6 +8,9 @@ import pandas as pd
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from io import BytesIO
 
 # ── Sheet names ──────────────────────────────────────────────────────────────
 SH_SESSION  = "सेशन कोर्ट"
@@ -73,6 +76,45 @@ def get_sheet(ws_name: str):
     client = get_client()
     sh = client.open_by_url(st.secrets["SHEET_URL"])
     return sh.worksheet(ws_name)
+
+
+@st.cache_resource
+def get_drive_service():
+    """Service Account के माध्यम से Google Drive API client बनाता है।"""
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+
+def upload_dak_photo(file_bytes: bytes, filename: str, mime_type: str = "image/jpeg") -> str:
+    """Dak की फोटो Google Drive में अपलोड कर webViewLink लौटाता है।
+
+    DRIVE_FOLDER_ID सेट होने पर उसी निजी Drive folder में रखता है।
+    फ़ाइल सार्वजनिक नहीं की जाती; folder को service account और अधिकृत उपयोगकर्ता
+    के साथ उचित अनुमति से share करना चाहिए।
+    """
+    if not file_bytes:
+        raise ValueError("फोटो खाली है।")
+    service = get_drive_service()
+    metadata = {"name": filename}
+    folder_id = str(st.secrets.get("DRIVE_FOLDER_ID", "")).strip()
+    if folder_id:
+        metadata["parents"] = [folder_id]
+    media = MediaIoBaseUpload(BytesIO(file_bytes), mimetype=mime_type, resumable=True)
+    created = service.files().create(
+        body=metadata,
+        media_body=media,
+        fields="id,name,webViewLink"
+    ).execute()
+    link = created.get("webViewLink")
+    if not link and created.get("id"):
+        link = f"https://drive.google.com/file/d/{created['id']}/view"
+    if not link:
+        raise RuntimeError("Drive ने फ़ाइल का लिंक नहीं लौटाया।")
+    return link
 
 
 # ── Load ──────────────────────────────────────────────────────────────────────

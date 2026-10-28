@@ -646,46 +646,119 @@ elif page == "📋 सेशन कोर्ट":
 
     st.caption(f"दिख रहे हैं: **{len(filtered)}** / कुल {len(df)} मुकदमे")
 
-    # Show table — "अगली तारीख पेशी" पर टच करते ही कैलेंडर खुलेगा (inline edit)
-    show_cols = ["ST NO", "मु0अ0स0", "धारा", "बनाम", "न्यायालय",
-                 "तलब साक्षी", "अगली तारीख पेशी", "Status", "सम्मन की स्थिति", "कृत कार्यवाही"]
-    display_df = filtered[show_cols].copy()
-    display_df["अगली तारीख पेशी"] = display_df["अगली तारीख पेशी"].apply(parse_date_or_none)
-
-    edited_df = st.data_editor(
-        display_df,
-        use_container_width=True, hide_index=True, height=500,
-        key="session_list_editor",
-        column_config={
-            "ST NO": st.column_config.TextColumn("ST NO", disabled=True),
-            "मु0अ0स0": st.column_config.TextColumn(disabled=True),
-            "धारा": st.column_config.TextColumn(disabled=True),
-            "बनाम": st.column_config.TextColumn(disabled=True),
-            "न्यायालय": st.column_config.TextColumn(disabled=True),
-            "तलब साक्षी": st.column_config.TextColumn(disabled=True),
-            "अगली तारीख पेशी": st.column_config.DateColumn(
-                "अगली तारीख पेशी 📅", format="DD/MM/YYYY", step=1
-            ),
-            "Status": st.column_config.TextColumn(disabled=True),
-            "सम्मन की स्थिति": st.column_config.TextColumn(disabled=True),
-            "कृत कार्यवाही": st.column_config.TextColumn(disabled=True),
-        },
+    # ── Mobile-first case cards; desktop table remains available ─────────────
+    view_mode = st.radio(
+        "केस कैसे देखें?",
+        ["📱 कार्ड दृश्य", "🖥️ टेबल दृश्य"],
+        horizontal=True,
+        key="session_view_mode",
+        help="मोबाइल पर कार्ड दृश्य आसान है; बड़े स्क्रीन पर टेबल दृश्य भी चुन सकते हैं।"
     )
-    st.caption("📅 किसी भी केस की **अगली तारीख पेशी** पर टैप करें — कैलेंडर खुल जाएगा, नई तारीख चुनकर नीचे Save करें।")
 
-    changed_mask = edited_df["अगली तारीख पेशी"] != display_df["अगली तारीख पेशी"]
-    if changed_mask.any():
-        n_changed = int(changed_mask.sum())
-        st.warning(f"⚠️ {n_changed} केस की तारीख बदली गई है — अभी तक Google Sheet में save नहीं हुई।")
-        if st.button(f"💾 {n_changed} बदली गई तारीखें Save करें", type="primary", use_container_width=True):
-            ok_count = 0
-            for idx in edited_df[changed_mask].index:
-                st_no_val = str(edited_df.loc[idx, "ST NO"])
-                new_date_str = date_to_str(edited_df.loc[idx, "अगली तारीख पेशी"])
-                if gs.update_cell_session(st_no_val, "अगली तारीख पेशी", new_date_str):
-                    ok_count += 1
-            st.success(f"✅ {ok_count} तारीखें Save हो गईं!")
-            st.rerun()
+    if view_mode == "📱 कार्ड दृश्य":
+        st.caption("हर केस की मुख्य जानकारी एक कार्ड में है। अगली पेशी की तारीख यहीं से बदलकर Save कर सकते हैं।")
+        if filtered.empty:
+            st.info("चुने गए filter में कोई केस नहीं मिला।")
+        for card_i, (_, case_row) in enumerate(filtered.iterrows()):
+            st_no_card = str(case_row.get("ST NO", "")).strip()
+            safe_key = "".join(ch if ch.isalnum() else "_" for ch in st_no_card) or str(card_i)
+            case_status = str(case_row.get("Status", "") or "स्थिति उपलब्ध नहीं")
+            status_color = "#16845b" if case_status.strip() in ("साक्ष्य", "निस्तारित") else "#315bd6"
+            with st.container(border=True):
+                top_left, top_right = st.columns([3, 2])
+                with top_left:
+                    st.markdown(f"### 📄 ST NO: {st_no_card or '—'}")
+                with top_right:
+                    st.markdown(
+                        f"<div style='text-align:right;padding-top:8px;'>"
+                        f"<span style='background:{status_color};color:white;padding:4px 10px;"
+                        f"border-radius:20px;font-size:0.82rem;font-weight:600;'>"
+                        f"{case_status}</span></div>",
+                        unsafe_allow_html=True
+                    )
+                st.markdown(f"**👥 राज्य बनाम:** {str(case_row.get('बनाम', '') or '—')}")
+                info1, info2 = st.columns(2)
+                with info1:
+                    st.caption("⚖️ मु0अ0स0 / धारा")
+                    st.write(f"{case_row.get('मु0अ0स0', '') or '—'} / {case_row.get('धारा', '') or '—'}")
+                    st.caption("🏛️ न्यायालय")
+                    st.write(str(case_row.get("न्यायालय", "") or "—"))
+                with info2:
+                    st.caption("👤 तलब साक्षी")
+                    st.write(str(case_row.get("तलब साक्षी", "") or "—"))
+                    st.caption("🖨️ सम्मन स्थिति")
+                    st.write(str(case_row.get("सम्मन की स्थिति", "") or "—"))
+                st.caption("📝 कृत कार्यवाही")
+                st.write(str(case_row.get("कृत कार्यवाही", "") or "—"))
+
+                date_col, save_col = st.columns([3, 2])
+                current_date = parse_date_or_none(case_row.get("अगली तारीख पेशी", ""))
+                with date_col:
+                    new_date = st.date_input(
+                        "📅 अगली तारीख पेशी",
+                        value=current_date,
+                        format="DD/MM/YYYY",
+                        key=f"card_date_{safe_key}_{card_i}"
+                    )
+                with save_col:
+                    st.write("")
+                    st.write("")
+                    if st.button(
+                        "💾 तारीख Save",
+                        key=f"card_save_{safe_key}_{card_i}",
+                        use_container_width=True,
+                        type="primary",
+                        disabled=(new_date == current_date)
+                    ):
+                        if gs.update_cell_session(st_no_card, "अगली तारीख पेशी", date_to_str(new_date)):
+                            st.success(f"ST NO {st_no_card} की अगली तारीख save हो गई।")
+                            st.rerun()
+                        else:
+                            st.error("तारीख save नहीं हुई। कृपया दोबारा प्रयास करें।")
+                with st.expander("🔎 बाकी केस विवरण"):
+                    st.write(f"**पिछली पेशी:** {case_row.get('पिछली पेशी', '') or '—'}")
+                    st.write(f"**Type Of Moni:** {case_row.get('Type Of Moni', '') or '—'}")
+                    st.write(f"**कुल गवाह:** {case_row.get('कुल गवाह', '') or '—'}")
+                    st.write(f"**FIR दिनांक:** {case_row.get('FIR दिनांक', '') or '—'}")
+    else:
+        # Existing editable table retained for wide-screen users
+        display_df = filtered[show_cols].copy()
+        display_df["अगली तारीख पेशी"] = display_df["अगली तारीख पेशी"].apply(parse_date_or_none)
+
+        edited_df = st.data_editor(
+            display_df,
+            use_container_width=True, hide_index=True, height=500,
+            key="session_list_editor",
+            column_config={
+                "ST NO": st.column_config.TextColumn("ST NO", disabled=True),
+                "मु0अ0स0": st.column_config.TextColumn(disabled=True),
+                "धारा": st.column_config.TextColumn(disabled=True),
+                "बनाम": st.column_config.TextColumn(disabled=True),
+                "न्यायालय": st.column_config.TextColumn(disabled=True),
+                "तलब साक्षी": st.column_config.TextColumn(disabled=True),
+                "अगली तारीख पेशी": st.column_config.DateColumn(
+                    "अगली तारीख पेशी 📅", format="DD/MM/YYYY", step=1
+                ),
+                "Status": st.column_config.TextColumn(disabled=True),
+                "सम्मन की स्थिति": st.column_config.TextColumn(disabled=True),
+                "कृत कार्यवाही": st.column_config.TextColumn(disabled=True),
+            },
+        )
+        st.caption("📅 अगली तारीख पेशी पर टैप करें — कैलेंडर खुलेगा, तारीख बदलकर नीचे Save करें।")
+
+        changed_mask = edited_df["अगली तारीख पेशी"] != display_df["अगली तारीख पेशी"]
+        if changed_mask.any():
+            n_changed = int(changed_mask.sum())
+            st.warning(f"⚠️ {n_changed} केस की तारीख बदली गई है — अभी तक Google Sheet में save नहीं हुई।")
+            if st.button(f"💾 {n_changed} बदली गई तारीखें Save करें", type="primary", use_container_width=True):
+                ok_count = 0
+                for idx in edited_df[changed_mask].index:
+                    st_no_val = str(edited_df.loc[idx, "ST NO"])
+                    new_date_str = date_to_str(edited_df.loc[idx, "अगली तारीख पेशी"])
+                    if gs.update_cell_session(st_no_val, "अगली तारीख पेशी", new_date_str):
+                        ok_count += 1
+                st.success(f"✅ {ok_count} तारीखें Save हो गईं!")
+                st.rerun()
 
     # Download
     buf = __import__('io').BytesIO()

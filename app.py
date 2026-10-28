@@ -1195,9 +1195,37 @@ elif page == "📬 Dak Register":
             st.dataframe(
                 filtered, use_container_width=True, hide_index=True, height=400,
                 column_config={
-                    "लिंक": st.column_config.LinkColumn("लिंक", display_text="🔗 खोलें")
+                    "लिंक": st.column_config.TextColumn("फोटो / दस्तावेज़ लिंक")
                 }
             )
+
+            # एक Dak entry के सभी फोटो/दस्तावेज़ लिंक क्लिक करने योग्य दिखाएँ।
+            if not filtered.empty:
+                dak_link_options = [
+                    f"{i + 1}. {row.get('STN', '—') or '—'} — {row.get('बनाम', '—') or '—'} — {row.get('Type', '—') or '—'}"
+                    for i, (_, row) in enumerate(filtered.iterrows())
+                ]
+                selected_dak_link_entry = st.selectbox(
+                    "📎 फोटो / दस्तावेज़ देखने के लिए entry चुनें",
+                    dak_link_options,
+                    key="dak_photo_link_entry"
+                )
+                selected_link_row = filtered.iloc[dak_link_options.index(selected_dak_link_entry)]
+                dak_links = [
+                    item.strip() for item in str(selected_link_row.get("लिंक", "") or "").splitlines()
+                    if item.strip().startswith("https://") or item.strip().startswith("http://")
+                ]
+                if dak_links:
+                    link_cols = st.columns(min(len(dak_links), 3))
+                    for link_idx, photo_url in enumerate(dak_links):
+                        with link_cols[link_idx % len(link_cols)]:
+                            st.link_button(
+                                f"🔗 फोटो / दस्तावेज़ {link_idx + 1}",
+                                photo_url,
+                                use_container_width=True
+                            )
+                else:
+                    st.caption("इस entry के साथ कोई फोटो/दस्तावेज़ लिंक सेव नहीं है।")
 
             # ── 📄 INCOMPLETE Dak को थाने भेजने के लिए HTML रिपोर्ट ───────────
             st.divider()

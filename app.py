@@ -420,7 +420,7 @@ with st.sidebar:
     st.markdown(f"📍 **भिंगा, जनपद {JANPAD}**")
     st.divider()
 
-    page = st.radio("", [
+    page = st.radio("मुख्य नेविगेशन", [
         "📊 Dashboard",
         "📋 सेशन कोर्ट",
         "➕ नया केस",
@@ -688,15 +688,6 @@ elif page == "📋 सेशन कोर्ट":
             ny_f = st.selectbox("न्यायालय", ["सभी"] + gs.NYAYALAYA_OPTIONS, key="session_court_filter")
         with f3:
             samman_f = st.selectbox("सम्मन स्थिति", ["सभी"] + gs.SAMMAN_OPTIONS, key="session_summon_filter")
-
-    # पुराने variable नाम नीचे के मौजूदा filter logic के लिए बरकरार
-
-    with f2:
-        status_f = st.selectbox("Status", ["सभी"] + gs.STATUS_OPTIONS)
-    with f3:
-        ny_f = st.selectbox("न्यायालय", ["सभी"] + gs.NYAYALAYA_OPTIONS)
-    with f4:
-        samman_f = st.selectbox("सम्मन स्थिति", ["सभी"] + gs.SAMMAN_OPTIONS)
 
     with st.expander("📅 पिछली / अगली पेशी की तारीख से फ़िल्टर", expanded=False):
         d1, d2 = st.columns(2)

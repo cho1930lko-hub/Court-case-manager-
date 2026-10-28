@@ -663,9 +663,24 @@ elif page == "📋 सेशन कोर्ट":
     elif quick_filter == "search":
         st.info("नाम, ST NO या धारा लिखकर केस खोजें।")
 
-    f1, f2, f3, f4 = st.columns(4)
-    with f1:
-        search = st.text_input("🔍 खोजें", placeholder="नाम / ST NO / धारा")
+    # मोबाइल पर खोज सबसे पहले और साफ दिखाई दे
+    st.subheader("केस खोजें")
+    search = st.text_input(
+        "ST NO, अभियुक्त का नाम, मु0अ0सं0 या धारा लिखें",
+        placeholder="जैसे 193/2025, रामकुमार या 8/20 NDPS",
+        key="session_case_search"
+    )
+    with st.expander("अतिरिक्त फ़िल्टर", expanded=False):
+        f1, f2, f3 = st.columns(3)
+        with f1:
+            status_f = st.selectbox("स्थिति", ["सभी"] + gs.STATUS_OPTIONS, key="session_status_filter")
+        with f2:
+            ny_f = st.selectbox("न्यायालय", ["सभी"] + gs.NYAYALAYA_OPTIONS, key="session_court_filter")
+        with f3:
+            samman_f = st.selectbox("सम्मन स्थिति", ["सभी"] + gs.SAMMAN_OPTIONS, key="session_summon_filter")
+
+    # पुराने variable नाम नीचे के मौजूदा filter logic के लिए बरकरार
+
     with f2:
         status_f = st.selectbox("Status", ["सभी"] + gs.STATUS_OPTIONS)
     with f3:
@@ -673,7 +688,7 @@ elif page == "📋 सेशन कोर्ट":
     with f4:
         samman_f = st.selectbox("सम्मन स्थिति", ["सभी"] + gs.SAMMAN_OPTIONS)
 
-    with st.expander("📅 पिछली / अगली पेशी की तारीख से Filter करें", expanded=False):
+    with st.expander("📅 पिछली / अगली पेशी की तारीख से फ़िल्टर", expanded=False):
         d1, d2 = st.columns(2)
         with d1:
             agli_range = st.date_input(
@@ -714,7 +729,12 @@ elif page == "📋 सेशन कोर्ट":
     if pichli_range and len(pichli_range) == 2:
         filtered = filtered[filtered["पिछली पेशी"].apply(lambda x: _in_range(x, pichli_range))]
 
-    st.caption(f"दिख रहे हैं: **{len(filtered)}** / कुल {len(df)} मुकदमे")
+    st.caption(f"परिणाम: **{len(filtered)}** मुकदमे  |  कुल दर्ज: {len(df)}")
+
+    if search and not filtered.empty:
+        st.success(f"'{search}' के लिए {len(filtered)} मिलान मिले।")
+    elif search and filtered.empty:
+        st.info("इस खोज से कोई केस नहीं मिला। नाम या ST NO की वर्तनी जाँचें।")
 
     # Shared columns for the desktop table view
     show_cols = ["ST NO", "मु0अ0स0", "धारा", "बनाम", "न्यायालय",

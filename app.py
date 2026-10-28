@@ -14,7 +14,8 @@ import dak_gen as dg
 st.set_page_config(
     page_title="पैरवी रजिस्टर — भिंगा",
     page_icon="⚖️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 JANPAD = st.secrets.get("JANPAD", "श्रावस्ती")
@@ -415,7 +416,7 @@ with st.sidebar:
         "📝 कृत कार्यवाही रिपोर्ट",
         "📬 Dak Register",
         "🔒 Rimand Register",
-    ], label_visibility="collapsed")
+    ], label_visibility="collapsed", key="page_nav")
 
     st.divider()
     if st.button("🔄 Data Refresh", use_container_width=True):
@@ -432,8 +433,25 @@ with st.sidebar:
 # 1. DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "📊 Dashboard":
-    st.header("📊 Dashboard")
+    st.header("📊 पैरवी Dashboard")
+    st.caption(f"📍 {THANA}, जनपद {JANPAD}  ·  आज: {gs.today_str()}")
 
+    # Quick actions: directly open frequently used modules
+    st.subheader("⚡ त्वरित कार्य")
+    quick_actions = st.columns(2)
+    quick_action_items = [
+        ("➕ नया केस जोड़ें", "➕ नया केस"),
+        ("📋 केस लिस्ट खोलें", "📋 सेशन कोर्ट"),
+        ("🖨️ समन जनरेटर", "🖨️ समन जनरेटर"),
+        ("📬 Dak Register", "📬 Dak Register"),
+    ]
+    for action_idx, (action_label, target_page) in enumerate(quick_action_items):
+        with quick_actions[action_idx % 2]:
+            if st.button(action_label, key=f"quick_action_{action_idx}", use_container_width=True):
+                st.session_state["page_nav"] = target_page
+                st.rerun()
+
+    st.divider()
     df_s = gs.load_session()
     df_d = gs.load_dak()
     df_addr = gs.load_address_book()

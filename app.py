@@ -401,6 +401,19 @@ def render_rimand_share_block(row: dict, key_prefix: str = ""):
                         key=f"{key_prefix}_rimand_wa")
 
 
+# Quick-navigation callbacks run before widgets are instantiated on rerun.
+# This avoids StreamlitWidgetAlreadyInstantiatedError when changing the radio key.
+def _navigate_from_home(target: str):
+    if target == "आज":
+        st.session_state["session_quick_filter"] = "today"
+        st.session_state["page_nav"] = "📋 सेशन कोर्ट"
+    elif target == "खोज":
+        st.session_state["session_quick_filter"] = "search"
+        st.session_state["page_nav"] = "📋 सेशन कोर्ट"
+    else:
+        st.session_state["page_nav"] = target
+
+
 # ── Sidebar Navigation ────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚖️ पैरवी रजिस्टर")
@@ -450,16 +463,13 @@ if page == "📊 Dashboard":
         action_cols = st.columns(2)
         for col_idx, (action_label, target) in enumerate(quick_action_items[row_start:row_start + 2]):
             with action_cols[col_idx]:
-                if st.button(action_label, key=f"home_action_{row_start + col_idx}", use_container_width=True):
-                    if target == "आज":
-                        st.session_state["session_quick_filter"] = "today"
-                        st.session_state["page_nav"] = "📋 सेशन कोर्ट"
-                    elif target == "खोज":
-                        st.session_state["session_quick_filter"] = "search"
-                        st.session_state["page_nav"] = "📋 सेशन कोर्ट"
-                    else:
-                        st.session_state["page_nav"] = target
-                    st.rerun()
+                st.button(
+                    action_label,
+                    key=f"home_action_{row_start + col_idx}",
+                    use_container_width=True,
+                    on_click=_navigate_from_home,
+                    args=(target,),
+                )
 
     st.divider()
     df_s = gs.load_session()

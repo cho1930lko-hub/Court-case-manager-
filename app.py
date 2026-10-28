@@ -646,6 +646,10 @@ elif page == "📋 सेशन कोर्ट":
 
     st.caption(f"दिख रहे हैं: **{len(filtered)}** / कुल {len(df)} मुकदमे")
 
+    # Shared columns for the desktop table view
+    show_cols = ["ST NO", "मु0अ0स0", "धारा", "बनाम", "न्यायालय",
+                 "तलब साक्षी", "अगली तारीख पेशी", "Status", "सम्मन की स्थिति", "कृत कार्यवाही"]
+
     # ── Mobile-first case cards; desktop table remains available ─────────────
     view_mode = st.radio(
         "केस कैसे देखें?",

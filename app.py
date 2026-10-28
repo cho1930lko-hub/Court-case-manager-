@@ -730,6 +730,11 @@ elif page == "📋 सेशन कोर्ट":
                         unsafe_allow_html=True
                     )
                 st.markdown(f"**👥 राज्य बनाम:** {str(case_row.get('बनाम', '') or '—')}")
+                next_hearing = str(case_row.get("अगली तारीख पेशी", "") or "").strip()
+                if next_hearing:
+                    st.info(f"📅 **अगली पेशी:** {next_hearing}")
+                else:
+                    st.warning("📅 अगली पेशी की तारीख दर्ज नहीं है।")
                 info1, info2 = st.columns(2)
                 with info1:
                     st.caption("⚖️ मु0अ0स0 / धारा")
@@ -773,6 +778,18 @@ elif page == "📋 सेशन कोर्ट":
                     st.write(f"**Type Of Moni:** {case_row.get('Type Of Moni', '') or '—'}")
                     st.write(f"**कुल गवाह:** {case_row.get('कुल गवाह', '') or '—'}")
                     st.write(f"**FIR दिनांक:** {case_row.get('FIR दिनांक', '') or '—'}")
+
+                with st.expander("⋯ केस एक्शन"):
+                    st.caption(f"ST NO: {st_no_card or '—'}")
+                    render_share_block(case_row.to_dict(), key_prefix=f"casecard_{safe_key}_{card_i}")
+                    if st.button(
+                        "✏️ इस केस का पूरा विवरण अपडेट करें",
+                        key=f"card_update_{safe_key}_{card_i}",
+                        use_container_width=True
+                    ):
+                        st.session_state["case_update_st_no"] = st_no_card
+                        st.session_state["page_nav"] = "✏️ केस अपडेट"
+                        st.rerun()
     else:
         # Existing editable table retained for wide-screen users
         display_df = filtered[show_cols].copy()

@@ -11,7 +11,7 @@
 - **➕ नया केस / ✏️ केस अपडेट:** Google Sheet में केस जोड़ना और मौजूदा केस अपडेट करना।
 - **🖨️ समन जनरेटर:** उपलब्ध केस डेटा से समन/वारंट/अन्य संबंधित दस्तावेज़ों के लिए HTML तैयार करना।
 - **📝 कृत कार्यवाही रिपोर्ट:** उपलब्ध केस डेटा से फ़िल्टर की हुई, प्रिंट करने योग्य HTML रिपोर्ट।
-- **📬 Dak Register:** डाक की entries देखना/अपडेट करना, नई entry जोड़ना और उपलब्ध रिपोर्ट बनाना।
+- **📬 Dak Register:** डाक की entries देखना/अपडेट करना, नई entry जोड़ना और उपलब्ध रिपोर्ट बनाना; नई entry में मोबाइल कैमरे से फोटो लेना या गैलरी से एक/अधिक फोटो चुनकर निजी Google Drive में अपलोड करना। फोटो लिंक `लिंक` कॉलम में सेव होते हैं।
 - **🔒 Rimand Register:** रिमांड entries देखना और नई entry जोड़ना।
 - **📱 Responsive UI:** मोबाइल और बड़े स्क्रीन के लिए अनुकूल लेआउट।
 
@@ -37,6 +37,7 @@
 3. एक Service Account बनाकर उसकी JSON key प्राप्त करें।
 4. JSON में मौजूद `client_email` को Google Spreadsheet के **Share** विकल्प में **Editor** अनुमति दें। शीट को सार्वजनिक करने की आवश्यकता नहीं है।
 5. Spreadsheet URL कॉपी करें। उसे Streamlit Secrets में `SHEET_URL` के रूप में सेट करें।
+6. Dak फोटो अपलोड के लिए Google Drive में एक **निजी folder** बनाएं। उस folder को Service Account के `client_email` के साथ Editor access से share करें और folder ID को `DRIVE_FOLDER_ID` में सेट करें। यदि उपयोगकर्ता को फोटो खोलनी है, तो उसी folder को उस अधिकृत Google खाते के साथ भी share करें। फ़ाइलों को सार्वजनिक (Anyone with the link) न करें।
 
 ## Streamlit Secrets कॉन्फ़िगरेशन
 
@@ -45,6 +46,7 @@
 ```toml
 APP_PASSWORD = "अपना-मजबूत-पासवर्ड"
 SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit"
+DRIVE_FOLDER_ID = "YOUR_PRIVATE_DRIVE_FOLDER_ID" # वैकल्पिक, फोटो इसी folder में सेव होंगी
 JANPAD = "श्रावस्ती"
 THANA = "कोतवाली भिंगा"
 

@@ -1244,6 +1244,38 @@ elif page == "📬 Dak Register":
 
     with tab2:
         st.subheader("➕ नई Dak Entry")
+        st.caption("फोटो सीधे कैमरे से लें या मोबाइल की गैलरी से चुनें। फोटो निजी Google Drive में सेव होगी और उसका लिंक Dak entry में जुड़ेगा।")
+
+        # Dynamic widget keys let the photo controls reset after a successful entry.
+        photo_version = st.session_state.get("dak_photo_upload_version", 0)
+        photo_mode = st.radio(
+            "फोटो कैसे जोड़नी है?",
+            ["📷 कैमरा से फोटो", "🖼️ गैलरी से अपलोड"],
+            horizontal=True,
+            key=f"dak_photo_mode_{photo_version}"
+        )
+        selected_photos = []
+        if photo_mode == "📷 कैमरा से फोटो":
+            camera_photo = st.camera_input(
+                "कैमरा खोलकर फोटो लें",
+                key=f"dak_camera_photo_{photo_version}"
+            )
+            if camera_photo is not None:
+                selected_photos = [camera_photo]
+        else:
+            gallery_photos = st.file_uploader(
+                "गैलरी से फोटो चुनें (एक से अधिक भी चुन सकते हैं)",
+                type=["jpg", "jpeg", "png", "webp"],
+                accept_multiple_files=True,
+                key=f"dak_gallery_photos_{photo_version}"
+            )
+            selected_photos = gallery_photos or []
+
+        if selected_photos:
+            st.caption(f"📎 चुनी गई फोटो: {len(selected_photos)}")
+            for photo in selected_photos:
+                st.image(photo, caption=photo.name if hasattr(photo, "name") else "कैमरा फोटो", width=180)
+
         with st.form("new_dak"):
             c1, c2 = st.columns(2)
             with c1:
@@ -1257,22 +1289,46 @@ elif page == "📬 Dak Register":
                 thane_date_d = st.date_input("थाने पर लाने का दिनांक 📅", value=None, format="DD/MM/YYYY")
                 peshi_date_d = st.date_input("तारीख़ पेशी 📅", value=None, format="DD/MM/YYYY")
                 remark   = st.text_input("रिमार्क")
-                link     = st.text_input("Google Drive Link (document)")
+                link     = st.text_input("Google Drive Link (document) — वैकल्पिक")
 
             sub = st.form_submit_button("✅ Entry जोड़ें", use_container_width=True, type="primary")
             if sub:
                 if not banam or not dak_type:
                     st.error("बनाम और Type ज़रूरी हैं।")
                 else:
-                    row = {
-                        "STN": stn, "बनाम": banam, "status": "INCOMPLETE",
-                        "Type": dak_type, "नाम पता": naam_pata,
-                        "संबंधित थाना": thana, "कोर्ट का नाम": court,
-                        "थाने पर लाने का दिनांक": date_to_str(thane_date_d),
-                        "तारीख़ पेशी": date_to_str(peshi_date_d), "रिमार्क": remark, "लिंक": link
-                    }
-                    if gs.append_row_dak(row):
-                        st.success("✅ Dak entry जोड़ी गई!")
+                    uploaded_links = []
+                    upload_failed = False
+                    if selected_photos:
+                        with st.spinner("फोटो Google Drive में अपलोड हो रही हैं…"):
+                            for photo_index, photo in enumerate(selected_photos, start=1):
+                                try:
+                                    photo_bytes = photo.getvalue()
+                                    mime_type = getattr(photo, "type", None) or "image/jpeg"
+                                    original_name = getattr(photo, "name", None) or f"dak_camera_{photo_index}.jpg"
+                                    safe_name = f"Dak_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo_index}_{original_name}"
+                                    uploaded_links.append(gs.upload_dak_photo(photo_bytes, safe_name, mime_type))
+                                except Exception as exc:
+                                    upload_failed = True
+                                    st.error(f"फोटो {photo_index} अपलोड नहीं हुई: {exc}")
+                                    break
+
+                    if upload_failed:
+                        st.warning("फोटो अपलोड सफल नहीं हुई, इसलिए Dak entry सेव नहीं की गई।")
+                    else:
+                        existing_links = [part.strip() for part in link.splitlines() if part.strip()]
+                        all_links = existing_links + uploaded_links
+                        row = {
+                            "STN": stn, "बनाम": banam, "status": "INCOMPLETE",
+                            "Type": dak_type, "नाम पता": naam_pata,
+                            "संबंधित थाना": thana, "कोर्ट का नाम": court,
+                            "थाने पर लाने का दिनांक": date_to_str(thane_date_d),
+                            "तारीख़ पेशी": date_to_str(peshi_date_d), "रिमार्क": remark,
+                            "लिंक": "\n".join(all_links)
+                        }
+                        if gs.append_row_dak(row):
+                            st.success(f"✅ Dak entry जोड़ दी गई। अपलोड की गई फोटो: {len(uploaded_links)}")
+                            st.session_state["dak_photo_upload_version"] = photo_version + 1
+                            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════

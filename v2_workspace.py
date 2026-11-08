@@ -442,7 +442,8 @@ def render_v2_workspace(janpad="श्रावस्ती", thana="कोत�
                         try:
                             versions = _rows("DOCUMENT VERSIONS")
                             group_rows = versions[versions["Document Group ID"].astype(str) == group_id]
-                            next_version = int(pd.to_numeric(group_rows["Version Number"], errors="coerce").max() or 1) + 1
+                            max_version = pd.to_numeric(group_rows["Version Number"], errors="coerce").max()
+                            next_version = int(max_version) + 1 if pd.notna(max_version) else 2
                             file_id, link = _drive_upload(
                                 new_file, f"{case_id}_{group_id}_v{next_version}_{new_file.name}"
                             )

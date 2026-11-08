@@ -47,6 +47,7 @@
 APP_PASSWORD = "अपना-मजबूत-पासवर्ड"
 SHEET_URL = "https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit"
 DRIVE_FOLDER_ID = "YOUR_PRIVATE_DRIVE_FOLDER_ID" # वैकल्पिक, फोटो इसी folder में सेव होंगी
+CASE_DOCUMENTS_FOLDER_ID = "YOUR_PRIVATE_CASE_DOCUMENTS_FOLDER_ID" # V2 दस्तावेजों का अलग निजी folder
 JANPAD = "श्रावस्ती"
 THANA = "कोतवाली भिंगा"
 
@@ -98,3 +99,12 @@ streamlit run app.py
 - ऐप Google Sheets पर निर्भर है; कोई अलग स्थानीय Excel डेटाबेस कॉन्फ़िगर नहीं है।
 - Dashboard और केस सूची खाली डेटा के साथ UI दिखा सकते हैं, लेकिन वास्तविक रिकॉर्ड पढ़ने/लिखने के लिए वैध Google credentials, सही Spreadsheet URL और अपेक्षित worksheet tabs आवश्यक हैं।
 - UI या कोड में बदलाव के बाद Streamlit Cloud Logs में नवीनतम run की जाँच करें। केवल GitHub commit होना, ऐप के सफलतापूर्वक चलने का प्रमाण नहीं है।
+
+
+## V2 Workspace (नए मॉड्यूल)
+
+मुख्य नेविगेशन में **🧩 V2 Workspace** जोड़ा गया है। यह मौजूदा रजिस्टरों से अलग नई worksheets बनाता है; पुराने worksheet/tab या रिकॉर्ड को rename, clear या delete नहीं करता। पहली बार उपयोग पर V2 की नई worksheets बनाने के लिए UI में स्पष्ट बटन दबाना होगा।
+
+V2 दस्तावेज अपलोड के लिए Google Drive में एक **अलग निजी folder** बनाएं, उसे Service Account के साथ Editor access दें और उसका ID Streamlit Secrets में `CASE_DOCUMENTS_FOLDER_ID` के रूप में सेट करें। इसे सार्वजनिक (Anyone with the link) न करें।
+
+प्रारंभिक V2 में Case Document Library, Case Timeline, Checklist, Document Version History और Activity Log के आधारभूत कार्य उपलब्ध हैं। OCR Analysis और AI Drafting अभी review/configuration workspace हैं; OCR engine या AI provider सक्रिय होने तक कोई दस्तावेज बाहरी सेवा को नहीं भेजा जाता और कोई AI-निर्मित कानूनी ड्राफ्ट होने का दावा नहीं किया जाता।

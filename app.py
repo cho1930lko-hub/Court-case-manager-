@@ -429,6 +429,7 @@ with st.sidebar:
         "📝 कृत कार्यवाही रिपोर्ट",
         "📬 Dak Register",
         "🔒 Rimand Register",
+        "🧩 V2 Workspace",
     ], label_visibility="collapsed", key="page_nav")
 
     st.divider()
@@ -1414,3 +1415,11 @@ elif page == "🔒 Rimand Register":
                     }
                     if gs.append_row_rimand(row):
                         st.success("✅ रिमांड entry जोड़ी गई!")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V2 WORKSPACE — additive modules; existing pages above remain unchanged
+# ══════════════════════════════════════════════════════════════════════════════
+if page == "🧩 V2 Workspace":
+    from v2_workspace import render_v2_workspace
+    render_v2_workspace(JANPAD, THANA)

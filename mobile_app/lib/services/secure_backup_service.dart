@@ -20,6 +20,10 @@ class SecureBackupService {
 
   static const _format = 'CCM-SECURE-BACKUP';
   static const _iterations = 310000;
+  // Bound untrusted backup input before JSON/base64/ZIP decoding.
+  static const _maxEnvelopeBytes = 512 * 1024 * 1024;
+  static const _maxArchiveEntries = 10000;
+  static const _maxUncompressedBytes = 1024 * 1024 * 1024;
   final _cipher = AesGcm.with256bits();
 
   Future<Uint8List> createBackup(String password) async {
@@ -79,6 +83,9 @@ class SecureBackupService {
 
   Future<void> restoreBackup(Uint8List fileBytes, String password, {bool allowUninitializedDatabase = false}) async {
     _validatePassword(password);
+    if (fileBytes.length > _maxEnvelopeBytes) {
+      throw const FormatException('Backup फ़ाइल निर्धारित सुरक्षित सीमा से बड़ी है।');
+    }
     final decoded = jsonDecode(utf8.decode(fileBytes));
     if (decoded is! Map<String, dynamic> ||
         decoded['format'] != _format || decoded['version'] != 1) {
@@ -100,6 +107,29 @@ class SecureBackupService {
     );
 
     final archive = ZipDecoder().decodeBytes(clear);
+    if (archive.files.length > _maxArchiveEntries) {
+      throw const FormatException('Backup में बहुत अधिक फ़ाइलें हैं।');
+    }
+    var totalSize = 0;
+    final entryNames = <String>{};
+    for (final entry in archive.files) {
+      if (!entry.isFile) continue;
+      if (!entryNames.add(entry.name)) {
+        throw const FormatException('Backup में एक ही नाम की कई फ़ाइलें हैं।');
+      }
+      totalSize += entry.size;
+      if (totalSize > _maxUncompressedBytes) {
+        throw const FormatException('Backup का निकाला गया डेटा सुरक्षित सीमा से बड़ा है।');
+      }
+      // Database files and the two managed attachment roots are the only
+      // file paths the backup format is allowed to contain.
+      if (entry.name != 'database/court_case_manager.db' &&
+          entry.name != 'database/sqlcipher_key.txt' &&
+          !entry.name.startsWith('case_documents/') &&
+          !entry.name.startsWith('evidence/')) {
+        throw const FormatException('Backup में अनपेक्षित फ़ाइल पाई गई।');
+      }
+    }
     final dbEntry = archive.findFile('database/court_case_manager.db');
     if (dbEntry == null || !dbEntry.isFile) {
       throw const FormatException('Backup में database मौजूद नहीं है।');

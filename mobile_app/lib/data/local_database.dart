@@ -57,6 +57,7 @@ class LocalDatabase {
       final escapedKey = key.replaceAll("'", "''");
       await plainDb.execute("ATTACH DATABASE '$escapedPath' AS encrypted KEY '$escapedKey'");
       await plainDb.rawQuery("SELECT sqlcipher_export('encrypted')");
+      await plainDb.execute('PRAGMA encrypted.user_version = 2');
       await plainDb.execute('DETACH DATABASE encrypted');
       await plainDb.close();
       plainDb = null;

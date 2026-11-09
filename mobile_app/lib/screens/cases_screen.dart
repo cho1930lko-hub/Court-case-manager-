@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local_database.dart';
+import '../theme/app_theme.dart';
 
 class CasesScreen extends StatefulWidget {
   const CasesScreen({super.key});
@@ -43,6 +44,10 @@ class _CasesScreenState extends State<CasesScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: AppTheme.canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => _CaseForm(initial: row),
     );
     if (result == null) return;
@@ -87,69 +92,156 @@ class _CasesScreenState extends State<CasesScreen> {
     await _load();
   }
 
+  Color _statusColor(String value) {
+    if (value.contains('NBW')) return const Color(0xFFB54735);
+    if (value == 'जजमेंट' || value == 'सजा' || value == 'दोष मुक्त') return AppTheme.teal;
+    if (value == 'बहस') return const Color(0xFF8A641D);
+    return AppTheme.blue;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('सेशन कोर्ट')),
+      appBar: AppBar(
+        title: const Text('सेशन कोर्ट'),
+        actions: [
+          IconButton(tooltip: 'रीफ्रेश', onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
+          const SizedBox(width: 4),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _editCase(),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
         label: const Text('नया मुकदमा'),
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: TextField(
-              controller: _search,
-              decoration: InputDecoration(
-                hintText: 'ST NO, मु0अ0सं0, नाम या धारा खोजें',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  onPressed: _search.clear,
-                  icon: const Icon(Icons.close),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+            decoration: const BoxDecoration(
+              color: AppTheme.navy,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('मुकदमा प्रबंधन', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 5),
+                Text('${_cases.length} रिकॉर्ड सूची में', style: const TextStyle(color: Color(0xFFD4DEED), fontSize: 13)),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _search,
+                  style: const TextStyle(color: AppTheme.ink),
+                  decoration: InputDecoration(
+                    hintText: 'ST NO, मु0अ0सं0, नाम या धारा खोजें',
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.muted),
+                    suffixIcon: _search.text.isEmpty
+                        ? null
+                        : IconButton(onPressed: _search.clear, icon: const Icon(Icons.close_rounded)),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  ),
                 ),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-              ),
+              ],
             ),
           ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _cases.isEmpty
-                    ? const Center(child: Text('अभी कोई मुकदमा नहीं है। + नया मुकदमा से शुरुआत करें।'))
+                    ? _EmptyCases(searching: _search.text.isNotEmpty, onAdd: () => _editCase(), onClear: _search.clear)
                     : RefreshIndicator(
                         onRefresh: _load,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 90),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                           itemCount: _cases.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 11),
                           itemBuilder: (context, index) {
                             final row = _cases[index];
+                            final status = (row['status'] ?? 'साक्ष्य').toString();
                             return Card(
-                              child: ListTile(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(18),
                                 onTap: () => _editCase(row),
-                                leading: CircleAvatar(
-                                  backgroundColor: const Color(0xFFEAF0FF),
-                                  child: Text('${row['st_no'] ?? '-'}', style: const TextStyle(fontSize: 11)),
-                                ),
-                                title: Text('राज्य बनाम ${row['accused_name'] ?? ''}',
-                                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                                subtitle: Text(
-                                  'मु0अ0सं0: ${row['fir_no'] ?? '-'}  •  धारा: ${row['sections'] ?? '-'}\n'
-                                  '${row['court_name'] ?? ''}  •  अगली पेशी: ${row['next_hearing'] ?? '-'}',
-                                ),
-                                isThreeLine: true,
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'edit') _editCase(row);
-                                    if (value == 'archive') _archive(row);
-                                  },
-                                  itemBuilder: (_) => const [
-                                    PopupMenuItem(value: 'edit', child: Text('संपादित करें')),
-                                    PopupMenuItem(value: 'archive', child: Text('आर्काइव')),
-                                  ],
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(15, 14, 8, 14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            constraints: const BoxConstraints(minWidth: 58),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                                            decoration: BoxDecoration(color: const Color(0xFFEAF0FA), borderRadius: BorderRadius.circular(12)),
+                                            child: Column(
+                                              children: [
+                                                const Text('ST NO', style: TextStyle(fontSize: 9, color: AppTheme.muted, fontWeight: FontWeight.w700)),
+                                                Text('${row['st_no'] ?? '-'}', style: const TextStyle(fontSize: 15, color: AppTheme.navy, fontWeight: FontWeight.w800)),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text('राज्य बनाम ${row['accused_name'] ?? 'नाम उपलब्ध नहीं'}',
+                                                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.ink)),
+                                                const SizedBox(height: 5),
+                                                Text('मु0अ0सं0: ${row['fir_no'] ?? '-'}  •  धारा: ${row['sections'] ?? '-'}',
+                                                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuButton<String>(
+                                            tooltip: 'अन्य विकल्प',
+                                            onSelected: (value) {
+                                              if (value == 'edit') _editCase(row);
+                                              if (value == 'archive') _archive(row);
+                                            },
+                                            itemBuilder: (_) => const [
+                                              PopupMenuItem(value: 'edit', child: ListTile(dense: true, leading: Icon(Icons.edit_outlined), title: Text('संपादित करें'))),
+                                              PopupMenuItem(value: 'archive', child: ListTile(dense: true, leading: Icon(Icons.archive_outlined), title: Text('आर्काइव'))),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.account_balance_outlined, size: 15, color: AppTheme.muted),
+                                          const SizedBox(width: 6),
+                                          Expanded(child: Text((row['court_name'] ?? 'न्यायालय विवरण नहीं').toString(),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 12, color: AppTheme.muted))),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 9),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.event_outlined, size: 15, color: AppTheme.blue),
+                                          const SizedBox(width: 6),
+                                          Expanded(child: Text('अगली पेशी: ${row['next_hearing'] ?? '-'}',
+                                            style: const TextStyle(fontSize: 12, color: AppTheme.ink, fontWeight: FontWeight.w600))),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: _statusColor(status).withValues(alpha: .10),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _statusColor(status))),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
@@ -161,6 +253,41 @@ class _CasesScreenState extends State<CasesScreen> {
       ),
     );
   }
+}
+
+class _EmptyCases extends StatelessWidget {
+  const _EmptyCases({required this.searching, required this.onAdd, required this.onClear});
+  final bool searching;
+  final VoidCallback onAdd;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: const Color(0xFFEAF0FA), borderRadius: BorderRadius.circular(22)),
+            child: const Icon(Icons.folder_open_rounded, size: 38, color: AppTheme.blue),
+          ),
+          const SizedBox(height: 16),
+          Text(searching ? 'कोई रिकॉर्ड नहीं मिला' : 'अभी कोई मुकदमा दर्ज नहीं है',
+            style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(searching ? 'दूसरे नाम, ST NO या मु0अ0सं0 से खोजें।' : 'नया मुकदमा जोड़कर अपनी सूची तैयार करें।',
+            textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 16),
+          if (searching)
+            OutlinedButton.icon(onPressed: onClear, icon: const Icon(Icons.close), label: const Text('खोज हटाएँ'))
+          else
+            FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add), label: const Text('नया मुकदमा जोड़ें')),
+        ],
+      ),
+    ),
+  );
 }
 
 class _CaseForm extends StatefulWidget {
@@ -206,48 +333,71 @@ class _CaseFormState extends State<_CaseForm> {
     super.dispose();
   }
 
-  Widget _field(String label, TextEditingController c, {bool required = false, int lines = 1}) =>
+  Widget _field(String label, TextEditingController c, {bool required = false, int lines = 1, IconData? icon}) =>
       Padding(
-        padding: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.only(bottom: 12),
         child: TextFormField(
           controller: c,
           maxLines: lines,
-          decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+          decoration: InputDecoration(labelText: label, prefixIcon: icon == null ? null : Icon(icon, size: 19)),
           validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'यह विवरण आवश्यक है' : null : null,
         ),
       );
 
+  Widget _section(String title, IconData icon, List<Widget> children) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(15),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Icon(icon, color: AppTheme.blue, size: 19), const SizedBox(width: 8),
+          Text(title, style: Theme.of(context).textTheme.titleMedium)]),
+        const SizedBox(height: 14),
+        ...children,
+      ]),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(18, 18, 18, MediaQuery.of(context).viewInsets.bottom + 18),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).viewInsets.bottom + 16),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: AppTheme.line, borderRadius: BorderRadius.circular(4)))),
+              const SizedBox(height: 16),
               Text(widget.initial == null ? 'नया मुकदमा जोड़ें' : 'मुकदमा अपडेट करें',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 14),
-              _field('ST NO', stNo, required: true),
-              _field('मु0अ0सं0', firNo),
-              _field('धारा', sections),
-              _field('बनाम / अभियुक्त का नाम', accused, required: true),
-              _field('न्यायालय', court),
-              _field('तलब साक्षी', witnesses),
-              _field('अगली तारीख पेशी (DD/MM/YYYY)', nextHearing),
-              DropdownButtonFormField<String>(
-                initialValue: status,
-                decoration: const InputDecoration(labelText: 'मुकदमे की स्थिति', border: OutlineInputBorder()),
-                items: const ['साक्ष्य','हाजिरी','बहस','313 सीआरपीसी','सफाई साक्ष्य','जजमेंट','सजा','दोष मुक्त','अभियुक्त NBW']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                onChanged: (v) => setState(() => status = v ?? status),
-              ),
-              const SizedBox(height: 10),
-              _field('कृत कार्यवाही', action, lines: 3),
+                style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 4),
+              const Text('न्यायालयीन रिकॉर्ड का विवरण भरें', style: TextStyle(color: AppTheme.muted, fontSize: 13)),
+              const SizedBox(height: 18),
+              _section('मुकदमे का विवरण', Icons.gavel_rounded, [
+                Row(children: [
+                  Expanded(child: _field('ST NO *', stNo, required: true, icon: Icons.numbers_rounded)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _field('मु0अ0सं0', firNo, icon: Icons.folder_outlined)),
+                ]),
+                _field('धारा', sections, icon: Icons.menu_book_outlined),
+                _field('बनाम / अभियुक्त का नाम *', accused, required: true, icon: Icons.person_outline),
+                _field('न्यायालय', court, icon: Icons.account_balance_outlined),
+              ]),
               const SizedBox(height: 12),
+              _section('पेशी एवं कार्यवाही', Icons.event_note_rounded, [
+                _field('तलब साक्षी', witnesses, icon: Icons.groups_outlined),
+                _field('अगली तारीख पेशी (DD/MM/YYYY)', nextHearing, icon: Icons.calendar_month_outlined),
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'मुकदमे की स्थिति', prefixIcon: Icon(Icons.flag_outlined)),
+                  items: const ['साक्ष्य','हाजिरी','बहस','313 सीआरपीसी','सफाई साक्ष्य','जजमेंट','सजा','दोष मुक्त','अभियुक्त NBW']
+                    .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                  onChanged: (v) => setState(() => status = v ?? status),
+                ),
+                const SizedBox(height: 12),
+                _field('कृत कार्यवाही', action, lines: 3, icon: Icons.edit_note_rounded),
+              ]),
+              const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: () {
                   if (!_formKey.currentState!.validate()) return;
@@ -263,8 +413,8 @@ class _CaseFormState extends State<_CaseForm> {
                     'action_taken': action.text.trim(),
                   });
                 },
-                icon: const Icon(Icons.save),
-                label: const Text('सेव करें'),
+                icon: const Icon(Icons.save_rounded),
+                label: const Text('रिकॉर्ड सेव करें'),
               ),
             ],
           ),

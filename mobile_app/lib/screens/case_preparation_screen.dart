@@ -45,7 +45,7 @@ class _CasePreparationScreenState extends State<CasePreparationScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final q = _search.text.trim().toLowerCase();
-    return _cases.where((c) {
+    final visible = _cases.where((c) {
       final d = _date(c['next_hearing']);
       final pending = (c['checklist_pending'] as num?)?.toInt() ?? 0;
       final match = switch (_filter) {
@@ -57,6 +57,22 @@ class _CasePreparationScreenState extends State<CasePreparationScreen> {
       final text = [c['st_no'], c['fir_no'], c['accused_name'], c['court_name']].join(' ').toLowerCase();
       return match && (q.isEmpty || text.contains(q));
     }).toList();
+
+    // The database may contain legacy DD/MM/YYYY text. Never sort those
+    // values lexicographically (which puts 05/01/2027 before 10/11/2026).
+    visible.sort((a, b) {
+      final da = _date(a['next_hearing']);
+      final db = _date(b['next_hearing']);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      final byDate = da.compareTo(db);
+      if (byDate != 0) return byDate;
+      final sa = int.tryParse((a['st_no'] ?? '').toString()) ?? 0;
+      final sb = int.tryParse((b['st_no'] ?? '').toString()) ?? 0;
+      return sb.compareTo(sa);
+    });
+    return visible;
   }
 
   int get _pending => _cases.fold(0, (v, c) => v + ((c['checklist_pending'] as num?)?.toInt() ?? 0));

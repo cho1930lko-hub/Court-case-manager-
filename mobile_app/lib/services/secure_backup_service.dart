@@ -170,6 +170,7 @@ class SecureBackupService {
     // until the restored database has passed its final integrity check.
     final currentPath = await LocalDatabase.instance.databasePath();
     final currentFile = File(currentPath);
+    final hadCurrentDatabase = await currentFile.exists();
     final rollbackPath = '$currentPath.restore_previous';
     final previousDatabaseKey = await SecureDatabaseKey.instance.read();
     final managedRoots = const ['case_documents', 'evidence'];
@@ -243,11 +244,20 @@ class SecureBackupService {
         final sidecar = File('$currentPath$suffix');
         if (await sidecar.exists()) await sidecar.delete();
       }
-      if (await File(rollbackPath).exists()) {
-        await File(rollbackPath).copy(currentPath);
+      final rollbackFile = File(rollbackPath);
+      if (await rollbackFile.exists()) {
+        await rollbackFile.copy(currentPath);
+      } else if (!hadCurrentDatabase) {
+        // Recovery restore on a fresh/uninitialized install has no previous
+        // database to copy back. Never leave a partially installed DB behind.
+        final partialDatabase = File(currentPath);
+        if (await partialDatabase.exists()) await partialDatabase.delete();
       }
       if (previousDatabaseKey != null) {
         await SecureDatabaseKey.instance.replace(previousDatabaseKey);
+      } else {
+        // A missing pre-restore key must remain missing after a failed restore.
+        await SecureDatabaseKey.instance.clear();
       }
       for (final rootName in installedNewRoots) {
         final live = Directory(p.join(appDir.path, rootName));

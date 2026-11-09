@@ -106,9 +106,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (result == null) return;
     final id = (row?['id'] ?? const Uuid().v4()).toString();
     try {
-      await LocalDatabase.instance.saveRegister(widget.config.table, result, id: id, isNew: row == null);
-      await LocalDatabase.instance.logAction(row == null ? 'REGISTER_CREATED' : 'REGISTER_UPDATED',
-        widget.config.table, id, widget.config.title + ': ' + (result[widget.config.titleField] ?? '').toString());
+      await LocalDatabase.instance.saveWithAudit(
+        table: widget.config.table, values: result, recordId: id, isNew: row == null,
+        action: row == null ? 'REGISTER_CREATED' : 'REGISTER_UPDATED',
+        module: widget.config.table,
+        details: widget.config.title + ': ' + (result[widget.config.titleField] ?? '').toString(),
+      );
       await _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(row == null ? 'रिकॉर्ड सेव हो गया।' : 'रिकॉर्ड अपडेट हो गया।')));

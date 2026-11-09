@@ -112,27 +112,34 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                     border: Border.all(color: const Color(0xFFDCE5EF)),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Row(
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    runSpacing: 12,
+                    spacing: 12,
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                        child: const Icon(Icons.manage_history_rounded, color: AppTheme.ink),
-                      ),
-                      const SizedBox(width: 13),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('ऑडिट ट्रेल', style: TextStyle(color: AppTheme.ink, fontSize: 16, fontWeight: FontWeight.w700)),
-                            SizedBox(height: 3),
-                            Text('डिवाइस पर दर्ज गतिविधियों का विवरण', style: TextStyle(color: AppTheme.muted, fontSize: 12)),
-                          ],
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(Icons.manage_history_rounded, color: AppTheme.ink),
+                          ),
+                          const SizedBox(width: 13),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('ऑडिट ट्रेल', style: TextStyle(color: AppTheme.ink, fontSize: 16, fontWeight: FontWeight.w700)),
+                              SizedBox(height: 3),
+                              Text('डिवाइस पर दर्ज गतिविधियों का विवरण', style: TextStyle(color: AppTheme.muted, fontSize: 12)),
+                            ],
+                          ),
+                        ],
                       ),
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(rows.length.toString(), style: const TextStyle(color: AppTheme.ink, fontSize: 23, fontWeight: FontWeight.w800)),
                           const Text('कुल रिकॉर्ड', style: TextStyle(color: AppTheme.muted, fontSize: 10)),
@@ -186,10 +193,13 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                   ),
                 ],
                 const SizedBox(height: 17),
-                Row(
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
                     Text('हाल की गतिविधियाँ', style: Theme.of(context).textTheme.titleMedium),
-                    const Spacer(),
                     Text(visible.length.toString() + ' प्रविष्टियाँ', style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
@@ -199,6 +209,19 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                     icon: rows.isEmpty ? Icons.history_rounded : Icons.search_off_rounded,
                     title: rows.isEmpty ? 'अभी कोई गतिविधि दर्ज नहीं है' : 'कोई परिणाम नहीं मिला',
                     subtitle: rows.isEmpty ? 'ऐप में किए गए बदलाव यहाँ दिखाई देंगे।' : 'खोज शब्द या चुना हुआ मॉड्यूल बदलकर देखें।',
+                    action: rows.isEmpty
+                        ? null
+                        : OutlinedButton.icon(
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _query = '';
+                                _module = 'सभी';
+                              });
+                            },
+                            icon: const Icon(Icons.filter_alt_off_rounded),
+                            label: const Text('फ़िल्टर हटाएँ'),
+                          ),
                   )
                 else
                   ...visible.map((row) => Padding(
@@ -270,11 +293,13 @@ class _AuditCard extends StatelessWidget {
                     Text(details, style: const TextStyle(color: AppTheme.ink, fontSize: 13, height: 1.4)),
                   ],
                   const SizedBox(height: 10),
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 5,
+                    runSpacing: 3,
                     children: [
                       const Icon(Icons.schedule_rounded, size: 13, color: AppTheme.muted),
-                      const SizedBox(width: 5),
-                      Expanded(child: Text(date, style: const TextStyle(color: AppTheme.muted, fontSize: 11))),
+                      Text(date, style: const TextStyle(color: AppTheme.muted, fontSize: 11)),
                     ],
                   ),
                 ],

@@ -370,9 +370,121 @@ class _RegisterFormState extends State<_RegisterForm> {
               )
             : _isDateField(field.key) ? const Icon(Icons.calendar_month_outlined) : null,
       ),
-      validator: field.required
-          ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null
-          : null,
+      validator: (v) {
+        final value = (v ?? '').trim();
+        if (field.required && value.isEmpty) return 'यह विवरण आवश्यक है';
+        if (field.key == 'mobile' && value.isNotEmpty) {
+          final normalized = value.replaceAll(RegExp(r'[\\s-]'), '');
+          if (!RegExp(r'^(?:\\+?91)?[6-9]\\d{9}
+    ),
+  );
+
+  Widget _sectionCard(Map<String, Object?> section) {
+    final keys = section['fields'] as List<String>;
+    final fields = widget.config.fields.where((field) => keys.contains(field.key));
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(15, 15, 15, 3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppTheme.blue.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(section['icon'] as IconData, color: AppTheme.blue, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                section['title'] as String,
+                style: Theme.of(context).textTheme.titleMedium,
+              )),
+            ]),
+            const SizedBox(height: 15),
+            for (final field in fields) _buildField(field),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, keyboardInset + 12),
+        child: Form(
+          key: _formKey,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .88),
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(child: Container(width: 38, height: 4,
+                        decoration: BoxDecoration(color: AppTheme.line, borderRadius: BorderRadius.circular(4)))),
+                      const SizedBox(height: 16),
+                      Text(widget.initial == null ? 'नई एंट्री जोड़ें' : 'एंट्री संशोधित करें',
+                        style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 4),
+                      Text(widget.config.title, style: const TextStyle(color: AppTheme.muted, fontSize: 13)),
+                      const SizedBox(height: 18),
+                      for (final section in _formSections()) ...[
+                        _sectionCard(section),
+                        const SizedBox(height: 12),
+                      ],
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('रद्द करें'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                if (!_formKey.currentState!.validate()) return;
+                                Navigator.pop(context, {
+                                  for (final e in _controllers.entries) e.key: e.value.text.trim(),
+                                });
+                              },
+                              icon: const Icon(Icons.save_rounded),
+                              label: const Text('रिकॉर्ड सेव करें'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+).hasMatch(normalized)) {
+            return '10 अंकों का सही मोबाइल नंबर दर्ज करें';
+          }
+        }
+        return null;
+      },
     ),
   );
 

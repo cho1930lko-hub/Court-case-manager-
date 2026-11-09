@@ -6,6 +6,7 @@ import 'screens/court_documents_screen.dart';
 import 'screens/case_activity_screen.dart';
 import 'screens/case_documents_screen.dart';
 import 'screens/audit_log_screen.dart';
+import 'screens/backup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -144,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _ModuleTile(icon: Icons.timeline, title: 'Case Timeline & Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित कार्य', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseActivityScreen()))),
               _ModuleTile(icon: Icons.folder_copy, title: 'Case Document Library', subtitle: 'मुकदमे की फाइलें और पुराने संस्करण', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseDocumentsScreen()))),
               _ModuleTile(icon: Icons.security, title: 'Audit Log', subtitle: 'ऐप में दर्ज बदलावों का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditLogScreen()))),
-              const _ModuleTile(icon: Icons.backup, title: 'Backup & Export', subtitle: 'Excel और सुरक्षित ZIP बैकअप'),
+              _ModuleTile(icon: Icons.backup, title: 'Backup & Restore', subtitle: 'AES-256-GCM encrypted backup और restore', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BackupScreen()))),
               const SizedBox(height: 12),
               const Text('मुकदमे की कार्यवाही, चेकलिस्ट और दस्तावेज़ अब स्थानीय रूप से दर्ज किए जा सकते हैं.',
                   style: TextStyle(color: Colors.black54)),

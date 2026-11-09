@@ -402,6 +402,24 @@ class _CaseFormState extends State<_CaseForm> {
         ),
       );
 
+  String? _validateHearingDate(String? value) {
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return null;
+    final parts = text.split('/');
+    if (parts.length != 3) return 'तारीख DD/MM/YYYY में भरें';
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null || year < 1900 || year > 2100) {
+      return 'मान्य तारीख DD/MM/YYYY में भरें';
+    }
+    final date = DateTime(year, month, day);
+    if (date.day != day || date.month != month || date.year != year) {
+      return 'यह कैलेंडर तारीख मान्य नहीं है';
+    }
+    return null;
+  }
+
   Widget _section(String title, IconData icon, List<Widget> children) => Card(
     child: Padding(
       padding: const EdgeInsets.all(15),
@@ -463,13 +481,25 @@ class _CaseFormState extends State<_CaseForm> {
                       const SizedBox(height: 12),
                       _section('पेशी एवं कार्यवाही', Icons.event_note_rounded, [
                         _field('तलब साक्षी', witnesses, icon: Icons.groups_outlined),
-                        _field('अगली तारीख पेशी (DD/MM/YYYY)', nextHearing, icon: Icons.calendar_month_outlined),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: TextFormField(
+                            controller: nextHearing,
+                            decoration: const InputDecoration(
+                              labelText: 'अगली तारीख पेशी (DD/MM/YYYY)',
+                              prefixIcon: Icon(Icons.calendar_month_outlined),
+                            ),
+                            validator: _validateHearingDate,
+                          ),
+                        ),
                         DropdownButtonFormField<String>(
                           initialValue: status,
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'मुकदमे की स्थिति', prefixIcon: Icon(Icons.flag_outlined)),
-                          items: const ['साक्ष्य','हाजिरी','बहस','313 सीआरपीसी','सफाई साक्ष्य','जजमेंट','सजा','दोष मुक्त','अभियुक्त NBW']
-                            .map((v) => DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(),
+                          items: {
+                            ...const ['साक्ष्य','हाजिरी','बहस','313 सीआरपीसी','सफाई साक्ष्य','जजमेंट','सजा','दोष मुक्त','अभियुक्त NBW'],
+                            status,
+                          }.map((v) => DropdownMenuItem(value: v, child: Text(v.isEmpty ? 'स्थिति दर्ज नहीं' : v, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (v) => setState(() => status = v ?? status),
                         ),
                         const SizedBox(height: 12),

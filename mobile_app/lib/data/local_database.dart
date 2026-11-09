@@ -752,9 +752,10 @@ class LocalDatabase {
         if (changed != 1) throw StateError('Record not found for update');
       }
       for (final entry in customFieldValues.entries) {
+        final fieldModule = customFieldModule ?? module;
         await txn.insert('custom_field_values', {
-          'id': '${module}_${recordId}_${entry.key}',
-          'module': module, 'record_id': recordId,
+          'id': '${fieldModule}_${recordId}_${entry.key}',
+          'module': fieldModule, 'record_id': recordId,
           'field_id': entry.key, 'value': entry.value,
           'updated_at': now,
         }, conflictAlgorithm: ConflictAlgorithm.replace);

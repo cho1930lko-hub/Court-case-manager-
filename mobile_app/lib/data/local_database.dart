@@ -582,10 +582,13 @@ class LocalDatabase {
     required String type, required String description,
   }) async {
     final db = await database;
-    await db.insert('case_timeline', {
-      'id': id, 'case_id': caseId, 'event_date': date,
-      'event_type': type, 'description': description,
-      'created_at': DateTime.now().toIso8601String(),
+    await db.transaction((txn) async {
+      await txn.insert('case_timeline', {
+        'id': id, 'case_id': caseId, 'event_date': date,
+        'event_type': type, 'description': description,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      await _insertAudit(txn, 'TIMELINE_ADDED', 'CASE_TIMELINE', id, '$type: $description');
     });
   }
 
@@ -600,20 +603,31 @@ class LocalDatabase {
     required String dueDate, required String assignedTo, required String remarks,
   }) async {
     final db = await database;
-    await db.insert('case_checklist', {
-      'id': id, 'case_id': caseId, 'task_name': task,
-      'status': 'लंबित', 'due_date': dueDate, 'assigned_to': assignedTo,
-      'remarks': remarks, 'updated_at': DateTime.now().toIso8601String(),
+    await db.transaction((txn) async {
+      await txn.insert('case_checklist', {
+        'id': id, 'case_id': caseId, 'task_name': task,
+        'status': 'लंबित', 'due_date': dueDate, 'assigned_to': assignedTo,
+        'remarks': remarks, 'updated_at': DateTime.now().toIso8601String(),
+      });
+      await _insertAudit(txn, 'CHECKLIST_ADDED', 'CASE_CHECKLIST', id, task);
     });
   }
 
   Future<void> setChecklistStatus(String id, bool done) async {
     final db = await database;
-    await db.update('case_checklist', {
-      'status': done ? 'पूर्ण' : 'लंबित',
-      'completed_date': done ? DateTime.now().toIso8601String() : '',
-      'updated_at': DateTime.now().toIso8601String(),
-    }, where: 'id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      final changed = await txn.update('case_checklist', {
+        'status': done ? 'पूर्ण' : 'लंबित',
+        'completed_date': done ? DateTime.now().toIso8601String() : '',
+        'updated_at': DateTime.now().toIso8601String(),
+      }, where: 'id = ?', whereArgs: [id]);
+      if (changed != 1) throw StateError('Checklist task not found');
+      final rows = await txn.query('case_checklist',
+          columns: ['task_name'], where: 'id = ?', whereArgs: [id], limit: 1);
+      final taskName = rows.isEmpty ? id : (rows.first['task_name'] ?? id).toString();
+      await _insertAudit(txn, done ? 'TASK_COMPLETED' : 'TASK_REOPENED',
+          'CASE_CHECKLIST', id, taskName);
+    });
   }
 
   Future<List<Map<String, Object?>>> caseDocuments(String caseId) async {
@@ -639,6 +653,7 @@ class LocalDatabase {
         'version_number': 1, 'local_path': path,
         'change_remarks': 'मूल दस्तावेज़', 'created_at': now,
       });
+      await _insertAudit(txn, 'DOCUMENT_ATTACHED', 'CASE_DOCUMENTS', id, name);
     });
   }
 
@@ -695,9 +710,12 @@ class LocalDatabase {
         'version_number': version, 'local_path': path,
         'change_remarks': remarks, 'created_at': now,
       });
-      await txn.update('case_documents', {
+      final changed = await txn.update('case_documents', {
         'version': version, 'local_path': path, 'remarks': 'नवीनतम संस्करण',
       }, where: 'id = ?', whereArgs: [documentId]);
+      if (changed != 1) throw StateError('Document not found for version update');
+      await _insertAudit(txn, 'DOCUMENT_VERSION_ADDED', 'CASE_DOCUMENTS',
+          documentId, 'Version $version: $remarks');
     });
   }
 

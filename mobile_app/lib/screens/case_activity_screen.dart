@@ -5,7 +5,8 @@ import '../data/local_database.dart';
 import '../theme/app_theme.dart';
 
 class CaseActivityScreen extends StatefulWidget {
-  const CaseActivityScreen({super.key});
+  const CaseActivityScreen({super.key, this.initialCaseId});
+  final String? initialCaseId;
   @override
   State<CaseActivityScreen> createState() => _CaseActivityScreenState();
 }
@@ -27,7 +28,7 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
       if (mounted) setState(() { _cases = []; _events = []; _tasks = []; _loading = false; });
       return;
     }
-    final selected = _caseId ?? cases.first['id'].toString();
+    final selected = _caseId ?? widget.initialCaseId ?? cases.first['id'].toString();
     final events = await LocalDatabase.instance.caseTimeline(selected);
     final tasks = await LocalDatabase.instance.caseChecklist(selected);
     if (!mounted) return;

@@ -182,7 +182,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
         child: const Text('Excel डेटा पहले Preview में देखें। कॉलम का मिलान जाँचें, फिर Import करें। पुराने रिकॉर्ड अपने-आप overwrite नहीं होंगे।',
           style: TextStyle(color: Colors.white, height: 1.5))),
       const SizedBox(height: 14),
-      DropdownButtonFormField<String>(value: _module, decoration: const InputDecoration(labelText: 'मॉड्यूल'),
+      DropdownButtonFormField<String>(initialValue: _module, decoration: const InputDecoration(labelText: 'मॉड्यूल'),
         items: _modules.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
         onChanged: _busy ? null : (v) { if (v != null) { setState(() => _module = v); _loadColumns(); } }),
       const SizedBox(height: 12),
@@ -206,7 +206,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
             const Icon(Icons.arrow_forward, size: 16),
             const SizedBox(width: 8),
             Expanded(flex: 6, child: DropdownButtonFormField<String>(
-              value: _mapping[i], isExpanded: true, decoration: const InputDecoration(isDense: true),
+              initialValue: _mapping[i], isExpanded: true, decoration: const InputDecoration(isDense: true),
               items: [const DropdownMenuItem<String>(value: '', child: Text('छोड़ें')),
                 ..._columns.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis)))],
               onChanged: (v) => setState(() => _mapping[i] = (v == null || v.isEmpty) ? null : v),

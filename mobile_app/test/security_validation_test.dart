@@ -42,7 +42,7 @@ void main() {
 
     test('rejects nested traversal and absolute paths', () {
       expect(
-        () => safeCaseDocumentRelativePath(r'case_documents/a\\..\\..\\outside.txt'),
+        () => safeCaseDocumentRelativePath('case_documents/a\\\\..\\\\..\\\\outside.txt'),
         throwsA(isA<FormatException>()),
       );
       expect(

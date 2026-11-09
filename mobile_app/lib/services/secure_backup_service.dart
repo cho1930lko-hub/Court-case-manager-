@@ -77,7 +77,7 @@ class SecureBackupService {
     return Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
   }
 
-  Future<void> restoreBackup(Uint8List fileBytes, String password) async {
+  Future<void> restoreBackup(Uint8List fileBytes, String password, {bool allowUninitializedDatabase = false}) async {
     _validatePassword(password);
     final decoded = jsonDecode(utf8.decode(fileBytes));
     if (decoded is! Map<String, dynamic> ||
@@ -181,10 +181,12 @@ class SecureBackupService {
     final installedNewRoots = <String>[];
 
     try {
-      final liveDb = await LocalDatabase.instance.database;
-      final checkpoint = await liveDb.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
-      if (checkpoint.isNotEmpty && (checkpoint.first['busy'] as int? ?? 0) != 0) {
-        throw StateError('Database checkpoint busy है; restore सुरक्षित रूप से शुरू नहीं किया जा सकता।');
+      if (!allowUninitializedDatabase) {
+        final liveDb = await LocalDatabase.instance.database;
+        final checkpoint = await liveDb.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+        if (checkpoint.isNotEmpty && (checkpoint.first['busy'] as int? ?? 0) != 0) {
+          throw StateError('Database checkpoint busy है; restore सुरक्षित रूप से शुरू नहीं किया जा सकता।');
+        }
       }
       if (await currentFile.exists()) await currentFile.copy(rollbackPath);
 

@@ -115,12 +115,10 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
         await File(submittedPath).rename(destination);
         result['local_path'] = destination;
       }
-      await LocalDatabase.instance.saveEvidence(result, id: item?['id']?.toString());
-      await LocalDatabase.instance.logAction(
-        item == null ? 'EVIDENCE_CREATED' : 'EVIDENCE_UPDATED',
-        'EVIDENCE',
-        id,
-        result['description']?.toString() ?? '',
+      await LocalDatabase.instance.saveWithAudit(
+        table: 'evidence_items', values: result, recordId: id, isNew: item == null,
+        action: item == null ? 'EVIDENCE_CREATED' : 'EVIDENCE_UPDATED',
+        module: 'EVIDENCE', details: result['description']?.toString() ?? '',
       );
       _caseId = result['case_id']?.toString() ?? _caseId;
       await _load();
@@ -153,12 +151,8 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       ),
     );
     if (yes != true) return;
-    await LocalDatabase.instance.deleteEvidence(item['id'].toString());
-    await LocalDatabase.instance.logAction(
-      'EVIDENCE_RECORD_DELETED',
-      'EVIDENCE',
-      item['id'].toString(),
-      item['description']?.toString() ?? '',
+    await LocalDatabase.instance.deleteEvidenceWithAudit(
+      item['id'].toString(), item['description']?.toString() ?? '',
     );
     await _load();
   }

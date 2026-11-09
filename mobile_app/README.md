@@ -20,13 +20,21 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Local SQLite CRUD helpers and audit entries for register changes.
 - GitHub Actions workflow added for Flutter dependency resolution and static analysis.
 
+## Phase 2 progress
+
+- Initial summons draft generator linked to a selected Session Court case.
+- Initial action-report draft generator using case details and user-entered proceedings.
+- Generated drafts are stored in the local SQLite database and logged in the audit log.
+- Draft preview is selectable and can be copied for review/editing.
+
 ## Still pending
 
 - Full field-by-field parity with the existing Streamlit registers.
 - Review and validation of date fields, duplicate rules, and required fields.
 - Automated tests and actual Android-device testing.
 - Android platform project generation and release APK build.
-- Attachments/photos, Excel import/export, and backup/restore.
+- Officially formatted PDF/print output (Hindi font embedding is required before reliable PDF generation).
+- Dak attachments/photos, Excel import/export, and backup/restore.
 - Database encryption, app lock, backup encryption, restore validation, and device-loss recovery.
 - Legacy data import and row-count reconciliation.
 

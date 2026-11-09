@@ -97,19 +97,27 @@ jobs:
           from pathlib import Path
           import re
 
-          pub_cache = Path.home() / ".pub-cache" / "hosted" / "pub.dev"
-          patched = []
-          for gradle_file in pub_cache.glob("*/android/build.gradle*"):
+          pub_cache = Path.home() / ".pub-cache"
+          candidates = list(pub_cache.rglob("file_picker-*/android/build.gradle*"))
+          if not candidates:
+              raise SystemExit("file_picker Android Gradle file not found in pub cache")
+
+          for gradle_file in candidates:
               source = gradle_file.read_text()
-              updated = re.sub(r"(compileSdkVersion\s+)(?:flutter\.compileSdkVersion|[0-9]+)", r"\g<1>36", source)
-              updated = re.sub(r"(compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|[0-9]+)", r"\g<1>36", updated)
-              if updated != source:
-                  gradle_file.write_text(updated)
-                  patched.append(str(gradle_file))
-          print("Patched plugin Gradle files:", *patched, sep="\n")
-          file_picker = [p for p in patched if "/file_picker-" in p]
-          if not file_picker:
-              raise SystemExit("file_picker Android Gradle compileSdk was not patched")
+              # Support Groovy and Kotlin DSL forms:
+              # compileSdkVersion 34, compileSdk 34, compileSdk = 34,
+              # and Flutter's compileSdkVersion reference.
+              updated, count = re.subn(
+                  r"(?m)^(\\s*compileSdk(?:Version)?\\s*(?:=\\s*)?)(?:flutter\\.compileSdkVersion|[0-9]+)",
+                  r"\\g<1>36",
+                  source,
+              )
+              if count == 0:
+                  print(f"No compileSdk declaration matched in {gradle_file}")
+                  print("\\n".join(line for line in source.splitlines() if "compileSdk" in line))
+                  raise SystemExit("Unsupported file_picker compileSdk declaration; inspect printed lines")
+              gradle_file.write_text(updated)
+              print(f"Patched {gradle_file}: {count} declaration(s)")
           PY
       - name: Add SQLCipher ProGuard keep rules
         run: |

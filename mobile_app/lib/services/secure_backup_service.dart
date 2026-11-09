@@ -141,7 +141,7 @@ class SecureBackupService {
 
     for (final entry in archive.files) {
       if (!entry.isFile || !entry.name.startsWith('case_documents/')) continue;
-      final portableName = entry.name.replaceAll('\\\\', '/');
+      final portableName = entry.name.replaceAll(String.fromCharCode(92), '/');
       final relative = p.normalize(portableName);
       if (p.isAbsolute(relative) || relative.split('/').contains('..') || relative.startsWith('/')) {
         throw const FormatException('Backup में असुरक्षित file path मिला।');

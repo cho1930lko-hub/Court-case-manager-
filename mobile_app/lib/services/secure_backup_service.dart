@@ -141,8 +141,9 @@ class SecureBackupService {
 
     for (final entry in archive.files) {
       if (!entry.isFile || !entry.name.startsWith('case_documents/')) continue;
-      final relative = p.normalize(entry.name);
-      if (p.isAbsolute(relative) || relative.split(p.separator).contains('..')) {
+      final portableName = entry.name.replaceAll('\\\\', '/');
+      final relative = p.normalize(portableName);
+      if (p.isAbsolute(relative) || relative.split('/').contains('..') || relative.startsWith('/')) {
         throw const FormatException('Backup में असुरक्षित file path मिला।');
       }
       final out = File(p.join(appDir.path, 'case_documents_restore_tmp',

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../services/secure_database_key.dart';
@@ -409,6 +410,73 @@ class LocalDatabase {
         c.next_hearing ASC,
         CAST(c.st_no AS INTEGER) DESC
     ''');
+  }
+
+
+  /// Atomically changes a primary record and records the corresponding audit event.
+  /// An audit failure rolls back the record mutation instead of reporting a false save failure.
+  Future<void> saveWithAudit({
+    required String table,
+    required Map<String, Object?> values,
+    required String recordId,
+    required bool isNew,
+    required String action,
+    required String module,
+    required String details,
+  }) async {
+    const allowed = {'cases', 'dak_register', 'remand_register', 'address_book', 'evidence_items'};
+    if (!allowed.contains(table)) throw ArgumentError('Unsupported table: $table');
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      if (isNew) {
+        await txn.insert(table, {
+          ...values,
+          'id': recordId,
+          'created_at': now,
+          if (table == 'cases' || table == 'evidence_items' ||
+              table == 'dak_register') 'updated_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.abort);
+      } else {
+        final changed = await txn.update(table, {
+          ...values,
+          if (table == 'cases' || table == 'evidence_items' ||
+              table == 'dak_register') 'updated_at': now,
+        }, where: 'id = ?', whereArgs: [recordId]);
+        if (changed != 1) throw StateError('Record not found for update');
+      }
+      await _insertAudit(txn, action, module, recordId, details);
+    });
+  }
+
+  Future<void> archiveCaseWithAudit(String id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final changed = await txn.update('cases', {
+        'is_archived': 1, 'updated_at': DateTime.now().toIso8601String(),
+      }, where: 'id = ?', whereArgs: [id]);
+      if (changed != 1) throw StateError('Case not found for archive');
+      await _insertAudit(txn, 'CASE_ARCHIVED', 'SESSION_COURT', id, 'Soft archive');
+    });
+  }
+
+  Future<void> deleteEvidenceWithAudit(String id, String description) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final changed = await txn.delete('evidence_items', where: 'id = ?', whereArgs: [id]);
+      if (changed != 1) throw StateError('Evidence record not found');
+      await _insertAudit(txn, 'EVIDENCE_RECORD_DELETED', 'EVIDENCE', id, description);
+    });
+  }
+
+  Future<void> _insertAudit(DatabaseExecutor txn, String action,
+      String module, String recordId, String details) async {
+    final now = DateTime.now();
+    await txn.insert('audit_log', {
+      'id': '${now.microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}',
+      'action': action, 'module': module, 'record_id': recordId,
+      'details': details, 'created_at': now.toIso8601String(),
+    });
   }
 
   Future<void> saveCase(Map<String, Object?> values, {String? id}) async {

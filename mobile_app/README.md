@@ -60,20 +60,29 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Backup creation and restore now request a WAL truncate checkpoint and refuse to continue when SQLite reports a busy checkpoint.
 - CI adds SQLCipher ProGuard keep rules to its generated Android build and publishes the debug APK as a short-lived build artifact when all checks pass.
 
+## Phase 6 — Dynamic Fields and Register Import/Export
+
+- Added an additive SQLCipher schema migration for dynamic field definitions, dropdown options, per-role field metadata, custom values, import profiles and import history. Existing register rows and fixed columns are preserved.
+- Dynamic custom fields can be created per module, marked required, configured as text/number/date/dropdown/multiline/boolean metadata, and rendered in Session Court, Dak, Remand and Address Book entry forms. Custom values are saved in the same transaction as the register change and audit event.
+- Added Excel (.xlsx) import and Excel export from the module screens. Column headers are auto-matched with Hindi/English aliases and can be manually mapped.
+- Added row-level preview, duplicate/required-field checks and selection before import. Imports are additive; existing records are not overwritten. Import result and source are recorded in the local audit/import history.
+- Export includes the selected register data and configured custom-field values.
+- Google Sheets direct API sync is intentionally not enabled; download the sheet as .xlsx and import locally to preserve offline-first operation and avoid silently connecting court records to a cloud account.
+
 ## Still pending
 
 - Full field-by-field parity with the existing Streamlit registers.
 - Document version history browsing/rollback and stronger file integrity checks.
 - Audit log tamper resistance/export and user/device attribution (currently local app log only).
-- Review and validation of date fields, duplicate rules, and required fields.
+- Role enforcement against individual authenticated staff accounts (role metadata is currently configurable but the app does not yet have multi-user sign-in).
 - Automated tests and actual Android-device testing.
 - Android platform project generation and release APK build.
 - Officially formatted PDF/print output (Hindi font embedding is required before reliable PDF generation).
-- Dak attachments/photos and Excel import/export.
+- Dak attachments/photos.
 - Android-device verification of SQLCipher migration, key storage, lockout behavior, backup portability and restore rollback.
 - PIN recovery is intentionally not bypassable: use a verified encrypted backup on a clean installation/device and set a new local PIN. The backup password and backup file must both be available.
 - Backup compatibility tests across future app/schema versions and file completeness checks.
-- Legacy data import and row-count reconciliation.
+- Legacy data import and row-count reconciliation against all original registers.
 
 ## Build
 

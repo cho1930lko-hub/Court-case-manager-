@@ -224,12 +224,17 @@ class _CasesScreenState extends State<CasesScreen> {
                                         ],
                                       ),
                                       const SizedBox(height: 9),
-                                      Row(
+                                      Wrap(
+                                        spacing: 10,
+                                        runSpacing: 8,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
                                         children: [
-                                          Icon(Icons.event_outlined, size: 15, color: AppTheme.blue),
-                                          const SizedBox(width: 6),
-                                          Expanded(child: Text('अगली पेशी: ${row['next_hearing'] ?? '-'}',
-                                            style: const TextStyle(fontSize: 12, color: AppTheme.ink, fontWeight: FontWeight.w600))),
+                                          Row(mainAxisSize: MainAxisSize.min, children: [
+                                            Icon(Icons.event_outlined, size: 15, color: AppTheme.blue),
+                                            const SizedBox(width: 6),
+                                            Text('अगली पेशी: ${row['next_hearing'] ?? '-'}',
+                                              style: const TextStyle(fontSize: 12, color: AppTheme.ink, fontWeight: FontWeight.w600)),
+                                          ]),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                             decoration: BoxDecoration(

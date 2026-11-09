@@ -95,7 +95,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           pub_cache = Path.home() / ".pub-cache"
           candidates = list(pub_cache.rglob("file_picker-*/android/build.gradle*"))
@@ -103,21 +102,22 @@ jobs:
               raise SystemExit("file_picker Android Gradle file not found in pub cache")
 
           for gradle_file in candidates:
-              source = gradle_file.read_text()
-              # Support Groovy and Kotlin DSL forms:
-              # compileSdkVersion 34, compileSdk 34, compileSdk = 34,
-              # and Flutter's compileSdkVersion reference.
-              updated, count = re.subn(
-                  r"(?m)^(\\s*compileSdk(?:Version)?\\s*(?:=\\s*)?)(?:flutter\\.compileSdkVersion|[0-9]+)",
-                  r"\\g<1>36",
-                  source,
-              )
-              if count == 0:
-                  print(f"No compileSdk declaration matched in {gradle_file}")
-                  print("\\n".join(line for line in source.splitlines() if "compileSdk" in line))
-                  raise SystemExit("Unsupported file_picker compileSdk declaration; inspect printed lines")
-              gradle_file.write_text(updated)
-              print(f"Patched {gradle_file}: {count} declaration(s)")
+              lines = gradle_file.read_text().splitlines()
+              changed = False
+              for index, line in enumerate(lines):
+                  stripped = line.strip()
+                  if stripped.startswith("compileSdk ") or stripped.startswith("compileSdkVersion "):
+                      prefix = line[:len(line) - len(line.lstrip())]
+                      declaration = stripped.split("=", 1)[0].strip()
+                      if declaration in ("compileSdk", "compileSdkVersion"):
+                          lines[index] = prefix + declaration + " 36"
+                          changed = True
+              if not changed:
+                  print(f"Could not locate compileSdk declaration in {gradle_file}")
+                  print("\\n".join(line for line in lines if "compileSdk" in line))
+                  raise SystemExit("Unsupported file_picker Gradle syntax")
+              gradle_file.write_text("\\n".join(lines) + "\\n")
+              print(f"Patched {gradle_file} to compileSdk 36")
           PY
       - name: Add SQLCipher ProGuard keep rules
         run: |

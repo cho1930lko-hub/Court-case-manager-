@@ -155,6 +155,7 @@ class LocalDatabase {
       'dak': await count('dak_register'),
       'remand': await count('remand_register'),
       'documents': await count('case_documents'),
+      'contacts': await count('address_book'),
     };
   }
 

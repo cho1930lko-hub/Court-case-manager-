@@ -40,14 +40,16 @@ class CourtCaseManagerApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
-      home: const AppLockGate(),
+      builder: (context, child) => AppLockGate(child: child ?? const SizedBox.shrink()),
+      home: const HomeScreen(),
     );
   }
 }
 
 
 class AppLockGate extends StatefulWidget {
-  const AppLockGate({super.key});
+  const AppLockGate({super.key, required this.child});
+  final Widget child;
   @override
   State<AppLockGate> createState() => _AppLockGateState();
 }
@@ -123,7 +125,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const HomeScreen(),
+        child,
         if (!_unlocked)
           Scaffold(
             backgroundColor: const Color(0xFFF4F6FB),

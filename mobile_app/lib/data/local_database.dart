@@ -25,7 +25,8 @@ class LocalDatabase {
       version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
-        await db.execute('PRAGMA journal_mode = WAL');
+        // journal_mode returns a result row; use rawQuery rather than execute.
+        await db.rawQuery('PRAGMA journal_mode = WAL');
       },
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {

@@ -42,9 +42,12 @@ class SecureBackupService {
     archive.addFile(ArchiveFile('database/sqlcipher_key.txt', keyBytes.length, keyBytes));
 
     final appDir = await getApplicationDocumentsDirectory();
-    final docsDir = Directory(p.join(appDir.path, 'case_documents'));
-    if (await docsDir.exists()) {
-      await for (final entity in docsDir.list(recursive: true, followLinks: false)) {
+    // Back up every app-managed attachment directory. Evidence files are
+    // stored separately from case_documents and must travel with the database.
+    for (final rootName in const ['case_documents', 'evidence']) {
+      final managedDir = Directory(p.join(appDir.path, rootName));
+      if (!await managedDir.exists()) continue;
+      await for (final entity in managedDir.list(recursive: true, followLinks: false)) {
         if (entity is File) {
           final relative = p.relative(entity.path, from: appDir.path).replaceAll('\\', '/');
           final bytes = await entity.readAsBytes();
@@ -139,68 +142,113 @@ class SecureBackupService {
     }
 
     final appDir = await getApplicationDocumentsDirectory();
-    final staging = Directory(p.join(appDir.path, 'case_documents_restore_tmp'));
+    final staging = Directory(p.join(appDir.path, 'managed_files_restore_tmp'));
     if (await staging.exists()) await staging.delete(recursive: true);
     await staging.create(recursive: true);
 
+    // Extract only the two known managed roots. Reject traversal and malformed
+    // paths before writing any decrypted attachment to disk.
     try {
       for (final entry in archive.files) {
-        if (!entry.isFile || !entry.name.startsWith('case_documents/')) continue;
-        final safeRelative = safeCaseDocumentRelativePath(entry.name);
+        if (!entry.isFile) continue;
+        if (!entry.name.startsWith('case_documents/') &&
+            !entry.name.startsWith('evidence/')) continue;
+        final safeRelative = safeManagedFileRelativePath(entry.name);
         final out = File(p.join(staging.path, safeRelative));
         await out.parent.create(recursive: true);
         await out.writeAsBytes(entry.content as List<int>, flush: true);
+      }
+      for (final rootName in const ['case_documents', 'evidence']) {
+        await Directory(p.join(staging.path, rootName)).create(recursive: true);
       }
     } catch (_) {
       if (await staging.exists()) await staging.delete(recursive: true);
       rethrow;
     }
 
-      // The decrypted staging copy must never outlive this restore attempt.
-      try {
-      // Close SQLite before replacing its file; keep a rollback copy until swap completes.
-      final currentPath = await LocalDatabase.instance.databasePath();
-      final currentFile = File(currentPath);
-      final rollbackPath = '$currentPath.restore_previous';
-      final liveDocs = Directory(p.join(appDir.path, 'case_documents'));
-      final oldDocs = Directory(p.join(appDir.path, 'case_documents_restore_previous'));
-      final previousDatabaseKey = await SecureDatabaseKey.instance.read();
+    // Keep rollback copies of both managed directories and the encrypted DB
+    // until the restored database has passed its final integrity check.
+    final currentPath = await LocalDatabase.instance.databasePath();
+    final currentFile = File(currentPath);
+    final rollbackPath = '$currentPath.restore_previous';
+    final previousDatabaseKey = await SecureDatabaseKey.instance.read();
+    final managedRoots = const ['case_documents', 'evidence'];
+    final oldPaths = <String, String>{
+      for (final rootName in managedRoots)
+        rootName: p.join(appDir.path, '${rootName}_restore_previous'),
+    };
+    final movedOldRoots = <String>[];
+    final installedNewRoots = <String>[];
+
+    try {
       final liveDb = await LocalDatabase.instance.database;
       final checkpoint = await liveDb.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
       if (checkpoint.isNotEmpty && (checkpoint.first['busy'] as int? ?? 0) != 0) {
         throw StateError('Database checkpoint busy है; restore सुरक्षित रूप से शुरू नहीं किया जा सकता।');
       }
       if (await currentFile.exists()) await currentFile.copy(rollbackPath);
-      if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
-      if (await liveDocs.exists()) await liveDocs.rename(oldDocs.path);
-      try {
-        await LocalDatabase.instance.closeForRestore();
-        for (final suffix in ['', '-wal', '-shm']) {
-          final old = File('$currentPath$suffix');
-          if (await old.exists()) await old.delete();
+
+      for (final rootName in managedRoots) {
+        final old = Directory(oldPaths[rootName]!);
+        if (await old.exists()) await old.delete(recursive: true);
+        final live = Directory(p.join(appDir.path, rootName));
+        if (await live.exists()) {
+          await live.rename(old.path);
+          movedOldRoots.add(rootName);
         }
-        await File(currentPath).writeAsBytes(dbBytes, flush: true);
-        await SecureDatabaseKey.instance.replace(backupDatabaseKey);
-        if (await staging.exists()) await staging.rename(liveDocs.path);
-        final restoredDb = await LocalDatabase.instance.database;
-        final check = await restoredDb.rawQuery('PRAGMA integrity_check');
-        if (check.isEmpty || check.first.values.first != 'ok') {
-          throw const FormatException('Restored database की अंतिम जाँच असफल हुई।');
-        }
-        if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
-        if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
-      } catch (_) {
-        await LocalDatabase.instance.closeForRestore();
-        for (final suffix in ['', '-wal', '-shm']) {
-          final sidecar = File('$currentPath$suffix');
-          if (await sidecar.exists()) await sidecar.delete();
-        }
-        if (await File(rollbackPath).exists()) await File(rollbackPath).copy(currentPath);
-        if (previousDatabaseKey != null) await SecureDatabaseKey.instance.replace(previousDatabaseKey);
-        if (await liveDocs.exists()) await liveDocs.delete(recursive: true);
-        if (await oldDocs.exists()) await oldDocs.rename(liveDocs.path);
-        rethrow;
       }
+
+      await LocalDatabase.instance.closeForRestore();
+      for (final suffix in ['', '-wal', '-shm']) {
+        final sidecar = File('$currentPath$suffix');
+        if (await sidecar.exists()) await sidecar.delete();
+      }
+      await File(currentPath).writeAsBytes(dbBytes, flush: true);
+      await SecureDatabaseKey.instance.replace(backupDatabaseKey);
+
+      for (final rootName in managedRoots) {
+        final stagedRoot = Directory(p.join(staging.path, rootName));
+        final liveRoot = Directory(p.join(appDir.path, rootName));
+        await stagedRoot.rename(liveRoot.path);
+        installedNewRoots.add(rootName);
+      }
+
+      final restoredDb = await LocalDatabase.instance.database;
+      final check = await restoredDb.rawQuery('PRAGMA integrity_check');
+      if (check.isEmpty || check.first.values.first != 'ok') {
+        throw const FormatException('Restored database की अंतिम जाँच असफल हुई।');
+      }
+
+      if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
+      for (final rootName in movedOldRoots) {
+        final old = Directory(oldPaths[rootName]!);
+        if (await old.exists()) await old.delete(recursive: true);
+      }
+    } catch (_) {
+      await LocalDatabase.instance.closeForRestore();
+      for (final suffix in ['', '-wal', '-shm']) {
+        final sidecar = File('$currentPath$suffix');
+        if (await sidecar.exists()) await sidecar.delete();
+      }
+      if (await File(rollbackPath).exists()) {
+        await File(rollbackPath).copy(currentPath);
+      }
+      if (previousDatabaseKey != null) {
+        await SecureDatabaseKey.instance.replace(previousDatabaseKey);
+      }
+      for (final rootName in installedNewRoots) {
+        final live = Directory(p.join(appDir.path, rootName));
+        if (await live.exists()) await live.delete(recursive: true);
+      }
+      for (final rootName in movedOldRoots.reversed) {
+        final old = Directory(oldPaths[rootName]!);
+        final live = Directory(p.join(appDir.path, rootName));
+        if (await old.exists()) {
+          if (await live.exists()) await live.delete(recursive: true);
+          await old.rename(live.path);
+        }
+      }
+      rethrow;
     } finally {
       if (await staging.exists()) await staging.delete(recursive: true);
     }

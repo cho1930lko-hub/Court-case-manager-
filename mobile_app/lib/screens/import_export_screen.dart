@@ -215,7 +215,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
         )),
         const SizedBox(height: 14),
         const Text('Preview — पहली 5 पंक्तियाँ', style: TextStyle(fontWeight: FontWeight.w800)),
-        ..._preview.take(5).asMap().entries.map((entry) => Card(
+        ..._preview.take(5).toList().asMap().entries.map((entry) => Card(
           child: Padding(padding: const EdgeInsets.all(10),
             child: Text('पंक्ति ${entry.key + 1}: ${entry.value.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
               maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)))),

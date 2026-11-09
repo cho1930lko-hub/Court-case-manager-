@@ -442,7 +442,7 @@ class LocalDatabase {
       for (final entry in values.entries) {
         await txn.insert('custom_field_values', {
           'id': '${module}_${recordId}_${entry.key}',
-          'module': customFieldModule ?? module, 'record_id': recordId,
+          'module': module, 'record_id': recordId,
           'field_id': entry.key, 'value': entry.value, 'updated_at': now,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }

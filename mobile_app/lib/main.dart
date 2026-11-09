@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'data/local_database.dart';
+import 'screens/cases_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 18),
               const Text('मुख्य मॉड्यूल', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-              const _ModuleTile(icon: Icons.folder_open, title: 'सेशन कोर्ट', subtitle: 'मुकदमे, पेशी, गवाह और स्थिति'),
+              _ModuleTile(icon: Icons.folder_open, title: 'सेशन कोर्ट', subtitle: 'मुकदमे, पेशी, गवाह और स्थिति', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CasesScreen()))),
               const _ModuleTile(icon: Icons.mark_email_unread, title: 'Dak Register', subtitle: 'डाक प्रविष्टि और फोटो'),
               const _ModuleTile(icon: Icons.assignment, title: 'Rimand Register', subtitle: 'रिमांड का रिकॉर्ड'),
               const _ModuleTile(icon: Icons.contacts, title: 'Address Book', subtitle: 'संपर्क और विभाग'),
@@ -169,10 +170,11 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ModuleTile extends StatelessWidget {
-  const _ModuleTile({required this.icon, required this.title, required this.subtitle});
+  const _ModuleTile({required this.icon, required this.title, required this.subtitle, this.onTap});
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -184,7 +186,7 @@ class _ModuleTile extends StatelessWidget {
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+      onTap: onTap ?? () => ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$title मॉड्यूल अगले विकास चरण में जोड़ा जाएगा।')),
       ),
     ),

@@ -1,7 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
 import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
 import 'screens/register_screen.dart';
@@ -13,7 +12,6 @@ import 'screens/audit_log_screen.dart';
 import 'screens/backup_screen.dart';
 import 'screens/global_search_screen.dart';
 import 'screens/evidence_screen.dart';
-import 'services/secure_backup_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -435,32 +433,6 @@ class _ModuleTile extends StatelessWidget {
             const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF9AA6B6)),
           ]),
         ),
-      ),
-    ),
-  );
-}
-
-class _UtilityTile extends StatelessWidget {
-  const _UtilityTile({required this.icon, required this.title, required this.onTap});
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE5EAF1))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(icon, color: AppTheme.blue, size: 23),
-          const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-        ]),
       ),
     ),
   );

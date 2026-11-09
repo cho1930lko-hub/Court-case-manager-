@@ -79,7 +79,8 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final matchingCases = _cases.where((c) => c['id']?.toString() == _caseId);\n    final selectedCase = matchingCases.isEmpty ? null : matchingCases.first;
+    final matchingCases = _cases.where((c) => c['id']?.toString() == _caseId);
+    final selectedCase = matchingCases.isEmpty ? null : matchingCases.first;
     final pending = _tasks.where((t) => t['status'] != 'पूर्ण').length;
     final completed = _tasks.length - pending;
     return Scaffold(
@@ -193,7 +194,9 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
         },
       );
 
-  Widget _taskList() => _tasks.isEmpty
+  Widget _taskList() {
+    final completed = _tasks.where((t) => t['status'] == 'पूर्ण').length;
+    return _tasks.isEmpty
     ? const _EmptyActivity(icon: Icons.checklist_rounded, title: 'अभी कोई Checklist नहीं है',
         subtitle: 'जरूरी कार्य जोड़ें और पूरा होने पर टिक करें।')
     : ListView(
@@ -216,6 +219,7 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
           for (final t in _tasks) _TaskCard(task: t, onChanged: (done) => _toggleTask(t, done)),
         ],
       );
+  }
 }
 
 class _SummaryPill extends StatelessWidget {

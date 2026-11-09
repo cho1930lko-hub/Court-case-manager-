@@ -64,6 +64,9 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   String _sourceName = '';
   bool _busy = false;
   Map<String, int>? _result;
+  Set<int> _duplicateRows = {};
+  Map<int, String> _invalidRows = {};
+  Set<int> _selectedRows = {};
 
   @override
   void initState() { super.initState(); _module = widget.initialModule; _loadColumns(); }
@@ -104,7 +107,8 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
         }
         map[i] = match;
       }
-      setState(() { _headers = headers; _sourceRows = data; _mapping = map; _sourceName = file.name; _result = null; });
+      setState(() { _headers = headers; _sourceRows = data; _mapping = map; _sourceName = file.name; _result = null; _duplicateRows = {}; _invalidRows = {}; _selectedRows = {}; });
+      await _analyseRows();
     } catch (e) { _message('Excel फाइल नहीं पढ़ी गई: $e'); }
   }
 
@@ -132,12 +136,54 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     return values;
   }).toList();
 
-  Future<void> _import() async {
-    final rows = _preview;
-    if (rows.isEmpty || rows.every((r) => r.isEmpty)) { _message('किसी कॉलम का मिलान नहीं हुआ।'); return; }
-    if (_module == 'cases' && rows.any((r) => (r['st_no'] ?? '').toString().trim().isEmpty)) {
-      _message('सेशन कोर्ट के प्रत्येक रिकॉर्ड में ST NO आवश्यक है।'); return;
+  Future<void> _analyseRows() async {
+    final current = await LocalDatabase.instance.exportRegisterRows(_module);
+    String key(Map<String, Object?> row) {
+      final fields = switch (_module) {
+        'cases' => ['st_no'],
+        'dak_register' => ['st_no', 'dak_type'],
+        'remand_register' => ['fir_no', 'remand_date'],
+        _ => ['mobile', 'name'],
+      };
+      final values = fields.map((f) => (row[f] ?? '').toString().trim().toLowerCase()).toList();
+      return values.every((v) => v.isEmpty) ? '' : values.join('|');
     }
+    final existing = current.map(key).where((v) => v.isNotEmpty).toSet();
+    final seen = <String>{};
+    final duplicates = <int>{};
+    final invalid = <int, String>{};
+    final values = _preview;
+    for (var i = 0; i < values.length; i++) {
+      final row = values[i];
+      final identity = key(row);
+      if (identity.isEmpty) invalid[i] = 'मुख्य पहचान वाला कॉलम खाली है';
+      else if (existing.contains(identity) || !seen.add(identity)) duplicates.add(i);
+      if (_module == 'cases' && (row['st_no'] ?? '').toString().trim().isEmpty) {
+        invalid[i] = 'ST No. आवश्यक है';
+      }
+      if (_module == 'address_book' && (row['name'] ?? '').toString().trim().isEmpty) {
+        invalid[i] = 'नाम आवश्यक है';
+      }
+      if (row.containsKey('total_witnesses') &&
+          int.tryParse(row['total_witnesses'].toString()) == null) {
+        invalid[i] = 'कुल गवाह संख्या गलत है';
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _duplicateRows = duplicates;
+      _invalidRows = invalid;
+      _selectedRows = {
+        for (var i = 0; i < values.length; i++)
+          if (!duplicates.contains(i) && !invalid.containsKey(i)) i,
+      };
+    });
+  }
+
+  Future<void> _import() async {
+    final allRows = _preview;
+    final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_duplicateRows.contains(i) && !_invalidRows.containsKey(i)) allRows[i]];
+    if (rows.isEmpty) { _message('Import के लिए कोई वैध रिकॉर्ड चयनित नहीं है।'); return; }
     setState(() => _busy = true);
     try {
       final result = await LocalDatabase.instance.importRegisterRows(_module, rows, sourceName: _sourceName);
@@ -209,20 +255,32 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
               initialValue: _mapping[i], isExpanded: true, decoration: const InputDecoration(isDense: true),
               items: [const DropdownMenuItem<String>(value: '', child: Text('छोड़ें')),
                 ..._columns.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis)))],
-              onChanged: (v) => setState(() => _mapping[i] = (v == null || v.isEmpty) ? null : v),
+              onChanged: (v) async { setState(() => _mapping[i] = (v == null || v.isEmpty) ? null : v); await _analyseRows(); },
             )),
           ]),
         )),
         const SizedBox(height: 14),
-        const Text('Preview — पहली 5 पंक्तियाँ', style: TextStyle(fontWeight: FontWeight.w800)),
-        ..._preview.take(5).toList().asMap().entries.map((entry) => Card(
-          child: Padding(padding: const EdgeInsets.all(10),
-            child: Text('पंक्ति ${entry.key + 1}: ${entry.value.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}',
-              maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)))),
-        ),
+        Text('Preview • चयनित ${_selectedRows.length} / ${_sourceRows.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text('डुप्लीकेट: ${_duplicateRows.length} • अमान्य: ${_invalidRows.length}',
+          style: const TextStyle(fontSize: 12, color: Colors.deepOrange)),
+        ...List.generate(_sourceRows.length > 30 ? 30 : _sourceRows.length, (i) {
+          final issue = _invalidRows[i] ?? (_duplicateRows.contains(i) ? 'डुप्लीकेट रिकॉर्ड' : '');
+          final row = _preview[i];
+          return CheckboxListTile(
+            dense: true, contentPadding: EdgeInsets.zero,
+            value: _selectedRows.contains(i),
+            onChanged: issue.isNotEmpty ? null : (v) => setState(() {
+              if (v == true) { _selectedRows.add(i); } else { _selectedRows.remove(i); }
+            }),
+            title: Text('पंक्ति ${i + 2} • ${row.values.take(3).where((v) => v.toString().isNotEmpty).join(' / ')}',
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: issue.isEmpty ? null : Text(issue, style: const TextStyle(color: Colors.deepOrange)),
+          );
+        }),
+        if (_sourceRows.length > 30) const Text('पहली 30 पंक्तियाँ दिखाई गई हैं; अन्य वैध पंक्तियाँ भी चयनित हैं।'),
         const SizedBox(height: 12),
-        FilledButton.icon(onPressed: _busy ? null : _import,
-          icon: const Icon(Icons.playlist_add_check), label: Text(_busy ? 'प्रक्रिया जारी…' : '${_sourceRows.length} पंक्तियाँ Import करें')),
+        FilledButton.icon(onPressed: _busy || _selectedRows.isEmpty ? null : _import,
+          icon: const Icon(Icons.playlist_add_check), label: Text(_busy ? 'प्रक्रिया जारी…' : '${_selectedRows.length} चयनित रिकॉर्ड Import करें')),
       ],
       if (_result != null) ...[
         const SizedBox(height: 14),

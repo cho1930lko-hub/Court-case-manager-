@@ -317,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _ModuleTile(icon: Icons.inventory_2_outlined, title: 'Evidence एवं Exhibit Manager', subtitle: 'बरामदगी, मालखाना, सील, Exhibit और संलग्न फाइलें', color: AppTheme.teal, onTap: () => _open(const EvidenceScreen())),
         _ModuleTile(icon: Icons.security_rounded, title: 'Audit Log', subtitle: 'ऐप में दर्ज गतिविधियों का रिकॉर्ड', color: AppTheme.blue, onTap: () => _open(const AuditLogScreen())),
         _ModuleTile(icon: Icons.tune_rounded, title: 'Dynamic Field Manager', subtitle: 'नए फील्ड, Dropdown और फील्ड अधिकार नियंत्रित करें', color: AppTheme.blue, onTap: () => _open(const FieldManagerScreen())),
-        _ModuleTile(icon: Icons.table_view_rounded, title: 'Data Input & Import/Export', subtitle: 'Excel Import, कॉलम मिलान, Preview और CSV Export', color: AppTheme.teal, onTap: () => _open(const ImportExportScreen())),
+        _ModuleTile(icon: Icons.table_view_rounded, title: 'Data Input & Import/Export', subtitle: 'Excel Import, कॉलम मिलान, Preview और Excel Export', color: AppTheme.teal, onTap: () => _open(const ImportExportScreen())),
         const SizedBox(height: 16),
         Text('सुरक्षा एवं बैकअप', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 10),

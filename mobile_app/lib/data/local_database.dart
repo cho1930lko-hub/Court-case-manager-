@@ -366,6 +366,11 @@ class LocalDatabase {
     return db.query('audit_log', orderBy: 'created_at DESC', limit: limit);
   }
 
+  Future<void> closeForRestore() async {
+    await _db?.close();
+    _db = null;
+  }
+
   Future<String> databasePath() async {
     final root = await getDatabasesPath();
     return p.join(root, 'court_case_manager.db');

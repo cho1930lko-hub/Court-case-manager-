@@ -52,6 +52,14 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Restore authenticates/decrypts the archive, validates the encrypted database using SQLCipher, stages document files, and keeps rollback copies while swapping data.
 - For Android release builds with code shrinking, add `-keep class net.sqlcipher.** { *; }` to `android/app/proguard-rules.pro` after generating the Android platform project.
 
+## Phase 5 progress
+
+- CI now runs dependency resolution, Flutter analysis, automated tests, and generates an Android debug APK on GitHub Actions.
+- Added automated validation tests for 6–8 digit PIN rules and the minimum backup-password length.
+- Updated deprecated Flutter form-field initial-value arguments and removed an unused import.
+- Backup creation and restore now request a WAL truncate checkpoint and refuse to continue when SQLite reports a busy checkpoint.
+- CI adds SQLCipher ProGuard keep rules to its generated Android build and publishes the debug APK as a short-lived build artifact when all checks pass.
+
 ## Still pending
 
 - Full field-by-field parity with the existing Streamlit registers.

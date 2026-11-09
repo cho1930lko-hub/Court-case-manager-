@@ -44,14 +44,14 @@ def patch_manifest():
     if not MANIFEST.exists():
         fail(f"{MANIFEST} not found")
     source = MANIFEST.read_text(encoding="utf-8")
-    if not re.search(r"<application\\b", source):
+    if not re.search(r"<application\b", source):
         fail("no <application> element in AndroidManifest.xml")
     for attr in ("allowBackup", "fullBackupContent", "dataExtractionRules"):
-        source = re.sub(rf'\\s+android:{attr}="[^"]*"', "", source)
-    attrs = ('\\n        android:allowBackup="false"'
-             '\\n        android:fullBackupContent="false"'
-             '\\n        android:dataExtractionRules="@xml/data_extraction_rules"')
-    source = re.sub(r"<application\\b", "<application" + attrs, source, count=1)
+        source = re.sub(rf'\s+android:{attr}="[^"]*"', "", source)
+    attrs = ('\n        android:allowBackup="false"'
+             '\n        android:fullBackupContent="false"'
+             '\n        android:dataExtractionRules="@xml/data_extraction_rules"')
+    source = re.sub(r"<application\b", "<application" + attrs, source, count=1)
     MANIFEST.write_text(source, encoding="utf-8")
     xml_dir = ANDROID / "app/src/main/res/xml"
     xml_dir.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,7 @@ def patch_activity():
     package = next((line for line in source.splitlines() if line.strip().startswith("package ")), None)
     if package is None:
         fail("package declaration missing")
-    path.write_text(package + "\\n" + ACTIVITY_BODY, encoding="utf-8")
+    path.write_text(package + "\n" + ACTIVITY_BODY, encoding="utf-8")
 
 if __name__ == "__main__":
     patch_manifest()

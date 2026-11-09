@@ -262,6 +262,27 @@ class LocalDatabase {
     );
   }
 
+
+  /// Aggregated preparation data for the upcoming-hearing workspace.
+  /// Reads existing tables only; no schema or record migration is required.
+  Future<List<Map<String, Object?>>> casePreparationSummary() async {
+    final db = await database;
+    return db.rawQuery('''
+      SELECT c.*,
+        COUNT(k.id) AS checklist_total,
+        SUM(CASE WHEN k.status = 'पूर्ण' THEN 1 ELSE 0 END) AS checklist_done,
+        SUM(CASE WHEN k.status != 'पूर्ण' THEN 1 ELSE 0 END) AS checklist_pending
+      FROM cases c
+      LEFT JOIN case_checklist k ON k.case_id = c.id
+      WHERE c.is_archived = 0
+      GROUP BY c.id
+      ORDER BY
+        CASE WHEN TRIM(COALESCE(c.next_hearing, '')) = '' THEN 1 ELSE 0 END,
+        c.next_hearing ASC,
+        CAST(c.st_no AS INTEGER) DESC
+    ''');
+  }
+
   Future<void> saveCase(Map<String, Object?> values, {String? id}) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();

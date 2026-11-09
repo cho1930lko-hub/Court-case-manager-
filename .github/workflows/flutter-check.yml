@@ -106,17 +106,19 @@ jobs:
               changed = False
               for index, line in enumerate(lines):
                   stripped = line.strip()
-                  if stripped.startswith("compileSdk ") or stripped.startswith("compileSdkVersion "):
+                  if stripped.startswith("compileSdkVersion "):
                       prefix = line[:len(line) - len(line.lstrip())]
-                      declaration = stripped.split("=", 1)[0].strip()
-                      if declaration in ("compileSdk", "compileSdkVersion"):
-                          lines[index] = prefix + declaration + " 36"
-                          changed = True
+                      lines[index] = prefix + "compileSdkVersion 36"
+                      changed = True
+                  elif stripped.startswith("compileSdk "):
+                      prefix = line[:len(line) - len(line.lstrip())]
+                      lines[index] = prefix + "compileSdk 36"
+                      changed = True
               if not changed:
                   print(f"Could not locate compileSdk declaration in {gradle_file}")
-                  print("\n".join(line for line in lines if "compileSdk" in line))
+                  print("\\n".join(line for line in lines if "compileSdk" in line))
                   raise SystemExit("Unsupported file_picker Gradle syntax")
-              gradle_file.write_text("\n".join(lines) + "\n")
+              gradle_file.write_text("\\n".join(lines) + "\\n")
               print(f"Patched {gradle_file} to compileSdk 36")
           PY
       - name: Add SQLCipher ProGuard keep rules

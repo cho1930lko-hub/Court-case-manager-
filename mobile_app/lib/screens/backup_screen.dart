@@ -25,6 +25,7 @@ class _BackupScreenState extends State<BackupScreen> {
       barrierDismissible: !_working,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          scrollable: true,
           title: Text(title),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -143,6 +144,7 @@ class _BackupScreenState extends State<BackupScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
         title: const Text('Restore से पहले ध्यान दें'),
         content: const Column(
           mainAxisSize: MainAxisSize.min,
@@ -220,45 +222,38 @@ class _BackupScreenState extends State<BackupScreen> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFFDCE5EF)),
                 ),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.shield_outlined, color: AppTheme.ink, size: 23),
-                    ),
-                    const SizedBox(width: 13),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'आपके डेटा की सुरक्षित कॉपी',
-                            style: TextStyle(color: AppTheme.ink, fontSize: 16, fontWeight: FontWeight.w700),
-                          ),
-                          SizedBox(height: 5),
-                          Text(
-                            'डेटाबेस और ऐप के Case Documents को password-protected backup में रखा जाता है।',
-                            style: TextStyle(color: AppTheme.muted, fontSize: 12, height: 1.45),
-                          ),
-                          SizedBox(height: 9),
-                          Row(
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44, height: 44,
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.shield_outlined, color: AppTheme.ink, size: 23),
+                        ),
+                        const SizedBox(width: 13),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.lock_outline_rounded, size: 14, color: AppTheme.muted),
-                              SizedBox(width: 6),
-                              Text(
-                                'AES-256-GCM encryption',
-                                style: TextStyle(color: AppTheme.ink, fontSize: 11, fontWeight: FontWeight.w600),
-                              ),
+                              Text('आपके डेटा की सुरक्षित कॉपी', style: TextStyle(color: AppTheme.ink, fontSize: 16, fontWeight: FontWeight.w700)),
+                              SizedBox(height: 5),
+                              Text('डेटाबेस और ऐप के Case Documents को password-protected backup में रखा जाता है।', style: TextStyle(color: AppTheme.muted, fontSize: 12, height: 1.45)),
                             ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 13),
+                    Wrap(
+                      spacing: 8, runSpacing: 8,
+                      children: const [
+                        _SecurityTag(icon: Icons.lock_outline_rounded, label: 'AES-256-GCM'),
+                        _SecurityTag(icon: Icons.password_rounded, label: 'Password protected'),
+                        _SecurityTag(icon: Icons.folder_zip_outlined, label: '.ccmbak फ़ाइल'),
+                      ],
                     ),
                   ],
                 ),
@@ -325,7 +320,8 @@ class _BackupScreenState extends State<BackupScreen> {
                 color: Colors.black.withValues(alpha: 0.28),
                 child: Center(
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    width: 360,
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -358,6 +354,23 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 }
 
+class _SecurityTag extends StatelessWidget {
+  const _SecurityTag({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFDCE5EF))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: AppTheme.ink),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(color: AppTheme.ink, fontSize: 11, fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
+}
 class _ActionCard extends StatelessWidget {
   const _ActionCard({
     required this.icon,

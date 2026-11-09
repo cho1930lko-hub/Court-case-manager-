@@ -45,6 +45,8 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   bool _configured = false;
   bool _unlocked = false;
   bool _busy = false;
+  bool _showPin = false;
+  bool _showConfirm = false;
   String? _error;
   final _pin = TextEditingController();
   final _confirm = TextEditingController();
@@ -74,31 +76,53 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      if (_unlocked && mounted) setState(() { _unlocked = false; _pin.clear(); });
+      if (_unlocked && mounted) {
+        setState(() {
+          _unlocked = false;
+          _pin.clear();
+          _confirm.clear();
+          _error = null;
+          _showPin = false;
+          _showConfirm = false;
+        });
+      }
     }
   }
 
   Future<void> _submit() async {
     if (_busy) return;
+    FocusScope.of(context).unfocus();
+    if (!RegExp(r'^\\d{6,8}$').hasMatch(_pin.text)) {
+      setState(() => _error = 'PIN में 6 से 8 अंक होने चाहिए।');
+      return;
+    }
+    if (!_configured && _pin.text != _confirm.text) {
+      setState(() => _error = 'दोनों PIN एक जैसे नहीं हैं।');
+      return;
+    }
     setState(() { _busy = true; _error = null; });
     try {
       if (!_configured) {
-        if (_pin.text != _confirm.text) {
-          setState(() => _error = 'दोनों PIN एक जैसे नहीं हैं।');
-          return;
-        }
         await AppLockService.instance.setPin(_pin.text);
         _configured = true;
       } else {
         final valid = await AppLockService.instance.verifyPin(_pin.text);
         if (!valid) {
-          setState(() => _error = 'गलत PIN। कृपया फिर से प्रयास करें।');
+          if (mounted) setState(() => _error = 'PIN सही नहीं है। कृपया फिर से प्रयास करें।');
           return;
         }
       }
-      if (mounted) setState(() { _unlocked = true; _pin.clear(); _confirm.clear(); });
+      if (mounted) {
+        setState(() {
+          _unlocked = true;
+          _pin.clear();
+          _confirm.clear();
+          _showPin = false;
+          _showConfirm = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -106,7 +130,12 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (!_ready) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (!_ready) {
+      return const Scaffold(
+        backgroundColor: AppTheme.canvas,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final setup = !_configured;
     return Stack(
       fit: StackFit.expand,
@@ -114,41 +143,128 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
         widget.child,
         if (!_unlocked)
           Scaffold(
-            backgroundColor: const Color(0xFFF4F6FB),
-            body: Center(child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Card(child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.lock_outline, size: 54, color: Color(0xFF3158B7)),
-                    const SizedBox(height: 14),
-                    Text(setup ? 'ऐप सुरक्षा PIN बनाएं' : 'पैरवी रजिस्टर अनलॉक करें',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text(setup ? 'पहली बार उपयोग से पहले 6 से 8 अंकों का PIN बनाएं।' : 'अपना PIN डालकर ऐप खोलें।',
-                      textAlign: TextAlign.center),
-                    const SizedBox(height: 18),
-                    TextField(controller: _pin, obscureText: true, keyboardType: TextInputType.number,
-                      maxLength: 8, decoration: const InputDecoration(labelText: 'PIN', border: OutlineInputBorder())),
-                    if (setup) ...[
-                      const SizedBox(height: 8),
-                      TextField(controller: _confirm, obscureText: true, keyboardType: TextInputType.number,
-                        maxLength: 8, decoration: const InputDecoration(labelText: 'PIN दोबारा डालें', border: OutlineInputBorder())),
-                    ],
-                    if (_error != null) Padding(padding: const EdgeInsets.only(top: 8),
-                      child: Text(_error!, style: const TextStyle(color: Colors.red))),
-                    const SizedBox(height: 12),
-                    SizedBox(width: double.infinity, child: FilledButton(
-                      onPressed: _busy ? null : _submit,
-                      child: _busy ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) :
-                        Text(setup ? 'PIN सेट करें' : 'अनलॉक करें'),
-                    )),
-                  ]),
-                )),
+            backgroundColor: AppTheme.canvas,
+            body: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(22),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 410),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 66,
+                              height: 66,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEAF0F7),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Icon(
+                                setup ? Icons.shield_outlined : Icons.lock_outline_rounded,
+                                size: 32,
+                                color: AppTheme.blue,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              setup ? 'ऐप सुरक्षा PIN बनाएं' : 'पैरवी रजिस्टर अनलॉक करें',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              setup
+                                  ? 'पहली बार उपयोग से पहले 6 से 8 अंकों का PIN बनाएं।'
+                                  : 'अपना सुरक्षा PIN डालकर ऐप खोलें।',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 24),
+                            TextField(
+                              controller: _pin,
+                              obscureText: !_showPin,
+                              keyboardType: TextInputType.number,
+                              textInputAction: setup ? TextInputAction.next : TextInputAction.done,
+                              maxLength: 8,
+                              onSubmitted: (_) { if (!setup) _submit(); },
+                              decoration: InputDecoration(
+                                labelText: setup ? 'नया PIN (6–8 अंक)' : 'सुरक्षा PIN',
+                                counterText: '',
+                                prefixIcon: const Icon(Icons.password_rounded),
+                                suffixIcon: IconButton(
+                                  tooltip: _showPin ? 'PIN छिपाएँ' : 'PIN दिखाएँ',
+                                  onPressed: () => setState(() => _showPin = !_showPin),
+                                  icon: Icon(_showPin ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                                ),
+                              ),
+                            ),
+                            if (setup) ...[
+                              const SizedBox(height: 13),
+                              TextField(
+                                controller: _confirm,
+                                obscureText: !_showConfirm,
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.done,
+                                maxLength: 8,
+                                onSubmitted: (_) => _submit(),
+                                decoration: InputDecoration(
+                                  labelText: 'PIN दोबारा डालें',
+                                  counterText: '',
+                                  prefixIcon: const Icon(Icons.verified_user_outlined),
+                                  suffixIcon: IconButton(
+                                    tooltip: _showConfirm ? 'PIN छिपाएँ' : 'PIN दिखाएँ',
+                                    onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                                    icon: Icon(_showConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (_error != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFEFED),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFF1D2CE)),
+                                ),
+                                child: Text(_error!,
+                                  style: const TextStyle(color: Color(0xFFAC4038), fontSize: 12, height: 1.4)),
+                              ),
+                            ],
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 49,
+                              child: FilledButton(
+                                onPressed: _busy ? null : _submit,
+                                child: _busy
+                                    ? const SizedBox(width: 19, height: 19,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : Text(setup ? 'PIN सेट करें' : 'ऐप अनलॉक करें'),
+                              ),
+                            ),
+                            if (setup) ...[
+                              const SizedBox(height: 14),
+                              const Text(
+                                'PIN सुरक्षित रखें। इसे भूलने पर ऐप में bypass उपलब्ध नहीं है।',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 11, height: 1.4, color: AppTheme.muted),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            )),
+            ),
           ),
       ],
     );

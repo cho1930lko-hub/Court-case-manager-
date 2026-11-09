@@ -31,7 +31,14 @@ class _CourtDocumentsScreenState extends State<CourtDocumentsScreen> {
   Future<void> _loadCases() async {
     final rows = await LocalDatabase.instance.searchCases('');
     if (!mounted) return;
-    setState(() { _cases = rows; if (rows.isNotEmpty) _caseId = rows.first['id']?.toString(); });
+    setState(() {
+      _cases = rows;
+      if (rows.isNotEmpty) {
+        _caseId = rows.first['id']?.toString();
+        _court.text = (rows.first['court_name'] ?? '').toString();
+        _hearingDate.text = (rows.first['next_hearing'] ?? '').toString();
+      }
+    });
   }
 
   Map<String, Object?>? get _selected {
@@ -93,7 +100,13 @@ class _CourtDocumentsScreenState extends State<CourtDocumentsScreen> {
               value: c['id'].toString(),
               child: Text('ST ${c['st_no']} • ${c['accused_name']}', overflow: TextOverflow.ellipsis),
             )).toList(),
-            onChanged: (v) => setState(() { _caseId = v; _preview = ''; }),
+            onChanged: (v) => setState(() {
+              _caseId = v;
+              _preview = '';
+              final selected = _selected;
+              _court.text = (selected?['court_name'] ?? '').toString();
+              _hearingDate.text = (selected?['next_hearing'] ?? '').toString();
+            }),
           ),
         const SizedBox(height: 12),
         TextField(controller: _court, decoration: const InputDecoration(

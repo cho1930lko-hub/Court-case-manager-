@@ -1,5 +1,5 @@
-import 'package:path/path.dart' as p;
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../services/secure_database_key.dart';
 
@@ -53,14 +53,20 @@ class LocalDatabase {
     Database? plainDb;
     try {
       plainDb = await openDatabase(path);
+      final versionRows = await plainDb.rawQuery('PRAGMA user_version');
+      final legacyVersion = versionRows.isEmpty ? 0 : (versionRows.first.values.first as int? ?? 0);
       final escapedPath = tempPath.replaceAll("'", "''");
       final escapedKey = key.replaceAll("'", "''");
       await plainDb.execute("ATTACH DATABASE '$escapedPath' AS encrypted KEY '$escapedKey'");
       await plainDb.rawQuery("SELECT sqlcipher_export('encrypted')");
-      await plainDb.execute('PRAGMA encrypted.user_version = 2');
+      await plainDb.execute('PRAGMA encrypted.user_version = $legacyVersion');
       await plainDb.execute('DETACH DATABASE encrypted');
       await plainDb.close();
       plainDb = null;
+      for (final suffix in ['-wal', '-shm']) {
+        final sidecar = File('$path$suffix');
+        if (await sidecar.exists()) await sidecar.delete();
+      }
 
       final migrated = File(tempPath);
       if (!await migrated.exists() || await migrated.length() < 100) {

@@ -47,7 +47,7 @@ class _FieldManagerScreenState extends State<FieldManagerScreen> {
           const SizedBox(height: 8),
           TextField(controller: key, decoration: const InputDecoration(labelText: 'Unique Key (जैसे witness_count)')),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(value: type, decoration: const InputDecoration(labelText: 'फील्ड प्रकार'),
+          DropdownButtonFormField<String>(initialValue: type, decoration: const InputDecoration(labelText: 'फील्ड प्रकार'),
             items: const [
               DropdownMenuItem(value: 'text', child: Text('Text')),
               DropdownMenuItem(value: 'number', child: Text('Number')),
@@ -63,7 +63,7 @@ class _FieldManagerScreenState extends State<FieldManagerScreen> {
           ],
           CheckboxListTile(value: requiredField, contentPadding: EdgeInsets.zero,
             title: const Text('अनिवार्य फील्ड'), onChanged: (v) => setDialog(() => requiredField = v ?? false)),
-          DropdownButtonFormField<String>(value: roles,
+          DropdownButtonFormField<String>(initialValue: roles,
             decoration: const InputDecoration(labelText: 'किसे बदलाव की अनुमति?'),
             items: const [
               DropdownMenuItem(value: 'admin', child: Text('केवल Admin')),
@@ -152,7 +152,7 @@ class _FieldManagerScreenState extends State<FieldManagerScreen> {
         child: const Text('रजिस्टर के फील्ड और Dropdown विकल्प नियंत्रित करें। पुराने डेटा को हटाए बिना बदलाव लागू होंगे।',
           style: TextStyle(color: Colors.white, fontSize: 13, height: 1.5))),
       Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-        child: DropdownButtonFormField<String>(value: _module,
+        child: DropdownButtonFormField<String>(initialValue: _module,
           decoration: const InputDecoration(labelText: 'मॉड्यूल चुनें'),
           items: _modules.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
           onChanged: (v) { if (v != null) setState(() => _module = v); _load(); })),

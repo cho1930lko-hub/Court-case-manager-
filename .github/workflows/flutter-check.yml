@@ -82,7 +82,7 @@ jobs:
                   source = path.read_text()
                   snippet = snippet_kts if path.suffix == ".kts" else snippet_groovy
                   if "Keep Android plugin modules aligned" not in source:
-                      path.write_text(source.rstrip() + "\\n" + snippet)
+                      path.write_text(source.rstrip() + "\n" + snippet)
                   print(f"Configured plugin compile SDK in {path}")
                   break
           else:

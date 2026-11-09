@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
+import 'screens/register_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -131,9 +132,9 @@ class _HomeScreenState extends State<HomeScreen> {
               const Text('मुख्य मॉड्यूल', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               _ModuleTile(icon: Icons.folder_open, title: 'सेशन कोर्ट', subtitle: 'मुकदमे, पेशी, गवाह और स्थिति', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CasesScreen()))),
-              const _ModuleTile(icon: Icons.mark_email_unread, title: 'Dak Register', subtitle: 'डाक प्रविष्टि और फोटो'),
-              const _ModuleTile(icon: Icons.assignment, title: 'Rimand Register', subtitle: 'रिमांड का रिकॉर्ड'),
-              const _ModuleTile(icon: Icons.contacts, title: 'Address Book', subtitle: 'संपर्क और विभाग'),
+              _ModuleTile(icon: Icons.mark_email_unread, title: 'Dak Register', subtitle: 'डाक प्रविष्टि और खोज', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: dakConfig)))),
+              _ModuleTile(icon: Icons.assignment, title: 'Rimand Register', subtitle: 'रिमांड का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: remandConfig)))),
+              _ModuleTile(icon: Icons.contacts, title: 'Address Book', subtitle: 'संपर्क और विभाग', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: addressConfig)))),
               const _ModuleTile(icon: Icons.history, title: 'Case Timeline & Checklist', subtitle: 'कार्यवाही का इतिहास और लंबित कार्य'),
               const _ModuleTile(icon: Icons.backup, title: 'Backup & Export', subtitle: 'Excel और सुरक्षित ZIP बैकअप'),
               const SizedBox(height: 12),

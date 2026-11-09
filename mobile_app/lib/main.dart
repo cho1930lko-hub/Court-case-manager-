@@ -30,8 +30,9 @@ class CourtCaseManagerApp extends StatelessWidget {
       title: 'पैरवी रजिस्टर',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      builder: (context, child) => AppLockGate(child: child ?? const SizedBox.shrink()),
-      home: const HomeScreen(),
+      // Keep the Navigator/MaterialApp intact. The lock is the home route,
+      // not a MaterialApp.builder overlay that can hide route/dialog content.
+      home: const AppLockGate(child: HomeScreen()),
     );
   }
 }
@@ -73,9 +74,17 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   }
 
   Future<void> _checkSetup() async {
-    final configured = await AppLockService.instance.isConfigured;
-    if (!mounted) return;
-    setState(() { _configured = configured; _ready = true; });
+    try {
+      final configured = await AppLockService.instance.isConfigured;
+      if (!mounted) return;
+      setState(() { _configured = configured; _ready = true; _startupError = null; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _ready = true;
+        _startupError = 'सुरक्षा PIN की स्थिति नहीं पढ़ी जा सकी: $e';
+      });
+    }
   }
 
   @override
@@ -191,6 +200,26 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
       return const Scaffold(
         backgroundColor: AppTheme.canvas,
         body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_startupError != null && !_recoveryMode && !_unlocked) {
+      return Scaffold(
+        backgroundColor: AppTheme.canvas,
+        body: SafeArea(child: Center(child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.error_outline, size: 44, color: AppTheme.blue),
+            const SizedBox(height: 16),
+            const Text('ऐप सुरक्षा शुरू नहीं हो सकी'),
+            const SizedBox(height: 12),
+            SelectableText(_startupError!, textAlign: TextAlign.center),
+            const SizedBox(height: 18),
+            FilledButton(onPressed: _checkSetup, child: const Text('दोबारा प्रयास करें')),
+            const SizedBox(height: 12),
+            const Text('ऐप का डेटा हटाएँ या अनइंस्टॉल न करें।'),
+          ]),
+        ))),
       );
     }
 

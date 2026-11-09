@@ -84,6 +84,21 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
 
   Future<void> _addVersion(Map<String, Object?> doc) async {
     if (_caseId == null) return;
+    final remarks = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('नया संस्करण जोड़ें'),
+        content: TextField(controller: remarks, maxLines: 3,
+          decoration: const InputDecoration(labelText: 'बदलाव का विवरण',
+            hintText: 'जैसे—संशोधित आदेश / नया हस्ताक्षरित दस्तावेज़')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('रद्द करें')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('फाइल चुनें')),
+        ],
+      ),
+    );
+    if (confirmed != true) { remarks.dispose(); return; }
     try {
       final picked = await FilePicker.platform.pickFiles(withData: false);
       if (picked == null || picked.files.single.path == null) return;
@@ -98,14 +113,83 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
       await LocalDatabase.instance.addDocumentVersion(
         id: id, groupId: doc['document_group_id'].toString(),
         documentId: doc['id'].toString(), version: version, path: destination,
-        remarks: 'नया संस्करण जोड़ा गया',
+        remarks: remarks.text.trim().isEmpty ? 'नया संस्करण जोड़ा गया' : remarks.text.trim(),
       );
-      await LocalDatabase.instance.updateDocumentVersion(doc['id'].toString(), version, destination);
-      await LocalDatabase.instance.logAction('DOCUMENT_VERSION_ADDED', 'CASE_DOCUMENTS', doc['id'].toString(), 'Version $version');
+      await LocalDatabase.instance.logAction(
+        'DOCUMENT_VERSION_ADDED', 'CASE_DOCUMENTS', doc['id'].toString(), 'Version $version',
+      );
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('नया संस्करण जोड़ने में समस्या: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('नया संस्करण जोड़ने में समस्या: $e')),
+      );
+    } finally {
+      remarks.dispose();
     }
+  }
+
+  Future<void> _showVersionHistory(Map<String, Object?> doc) async {
+    final versions = await LocalDatabase.instance.documentVersions(doc['id'].toString());
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * .68,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('संस्करण इतिहास', style: Theme.of(sheetContext).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(doc['name'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+              const SizedBox(height: 12),
+              Expanded(child: versions.isEmpty
+                ? const Center(child: Text('इस दस्तावेज़ का इतिहास उपलब्ध नहीं है।'))
+                : ListView.separated(
+                    itemCount: versions.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, index) {
+                      final v = versions[index];
+                      final number = v['version_number'] ?? '?';
+                      final path = (v['local_path'] ?? '').toString();
+                      final current = number.toString() == (doc['version'] ?? 1).toString();
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: current ? AppTheme.teal.withValues(alpha: .12) : AppTheme.blue.withValues(alpha: .09),
+                          child: Text('v$number', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+                            color: current ? AppTheme.teal : AppTheme.blue)),
+                        ),
+                        title: Text(current ? 'वर्तमान संस्करण' : 'पुराना संस्करण',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        subtitle: Text('${(v['change_remarks'] ?? '').toString()}\n${(v['created_at'] ?? '').toString()}',
+                          style: const TextStyle(fontSize: 11, height: 1.5)),
+                        isThreeLine: true,
+                        trailing: IconButton(
+                          tooltip: 'इस संस्करण की फाइल सेव करें',
+                          icon: const Icon(Icons.download_outlined),
+                          onPressed: () async {
+                            final file = File(path);
+                            if (!await file.exists()) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('इस संस्करण की फाइल उपलब्ध नहीं है।')),
+                              );
+                              return;
+                            }
+                            await FilePicker.platform.saveFile(
+                              fileName: p.basename(path), bytes: await file.readAsBytes(),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  )),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openFile(Map<String, Object?> doc) async {
@@ -225,10 +309,15 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
                       ])),
                       trailing: PopupMenuButton<String>(
                         tooltip: 'अन्य विकल्प',
-                        onSelected: (v) { if (v == 'version') _addVersion(d); if (v == 'open') _openFile(d); },
+                        onSelected: (v) {
+                          if (v == 'version') _addVersion(d);
+                          if (v == 'history') _showVersionHistory(d);
+                          if (v == 'open') _openFile(d);
+                        },
                         itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'open', child: ListTile(dense: true, leading: Icon(Icons.download_rounded), title: Text('फाइल सेव करें'))),
-                          PopupMenuItem(value: 'version', child: ListTile(dense: true, leading: Icon(Icons.history_rounded), title: Text('नया संस्करण'))),
+                          PopupMenuItem(value: 'open', child: ListTile(dense: true, leading: Icon(Icons.download_rounded), title: Text('वर्तमान फाइल सेव करें'))),
+                          PopupMenuItem(value: 'history', child: ListTile(dense: true, leading: Icon(Icons.history_rounded), title: Text('संस्करण इतिहास देखें'))),
+                          PopupMenuItem(value: 'version', child: ListTile(dense: true, leading: Icon(Icons.add_circle_outline_rounded), title: Text('नया संस्करण जोड़ें'))),
                         ],
                       ),
                       onTap: () => _openFile(d),

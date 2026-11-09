@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:court_case_manager/services/app_lock_service.dart';
 import 'package:court_case_manager/services/secure_backup_service.dart';
@@ -90,4 +95,106 @@ void main() {
       );
     });
   });
+
+  group('Secure backup restore input validation', () {
+    test('rejects a corrupt or non-JSON backup before touching local files', () async {
+      await expectLater(
+        SecureBackupService.instance.restoreBackup(
+          Uint8List.fromList(utf8.encode('not-json')),
+          'a-strong-backup-password',
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects a backup with an unsupported envelope', () async {
+      await expectLater(
+        SecureBackupService.instance.restoreBackup(
+          Uint8List.fromList(utf8.encode(jsonEncode({
+            'format': 'NOT-A-COURT-BACKUP',
+            'version': 1,
+          }))),
+          'a-strong-backup-password',
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects a validly encrypted archive that has no database entry', () async {
+      const password = 'correct-horse-battery';
+      final cipher = AesGcm.with256bits();
+      final salt = cipher.newNonce();
+      final nonce = cipher.newNonce();
+      final derived = await Pbkdf2(
+        macAlgorithm: Hmac.sha256(),
+        iterations: 310000,
+        bits: 256,
+      ).deriveKey(secretKey: SecretKey(utf8.encode(password)), nonce: salt);
+
+      final archive = Archive();
+      final payload = utf8.encode('not a database backup');
+      archive.addFile(ArchiveFile('unexpected.txt', payload.length, payload));
+      final zipped = ZipEncoder().encode(archive)!;
+      final encrypted = await cipher.encrypt(zipped, secretKey: derived, nonce: nonce);
+      final envelope = jsonEncode({
+        'format': 'CCM-SECURE-BACKUP',
+        'version': 1,
+        'kdf': 'PBKDF2-HMAC-SHA256',
+        'iterations': 310000,
+        'cipher': 'AES-256-GCM',
+        'salt': base64Encode(salt),
+        'nonce': base64Encode(encrypted.nonce),
+        'mac': base64Encode(encrypted.mac.bytes),
+        'ciphertext': base64Encode(encrypted.cipherText),
+      });
+
+      await expectLater(
+        SecureBackupService.instance.restoreBackup(
+          Uint8List.fromList(utf8.encode(envelope)),
+          password,
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects a backup encrypted with a different password', () async {
+      const originalPassword = 'original-backup-password';
+      final cipher = AesGcm.with256bits();
+      final salt = cipher.newNonce();
+      final nonce = cipher.newNonce();
+      final derived = await Pbkdf2(
+        macAlgorithm: Hmac.sha256(),
+        iterations: 310000,
+        bits: 256,
+      ).deriveKey(
+        secretKey: SecretKey(utf8.encode(originalPassword)),
+        nonce: salt,
+      );
+      final encrypted = await cipher.encrypt(
+        utf8.encode('authenticated test payload'),
+        secretKey: derived,
+        nonce: nonce,
+      );
+      final envelope = jsonEncode({
+        'format': 'CCM-SECURE-BACKUP',
+        'version': 1,
+        'kdf': 'PBKDF2-HMAC-SHA256',
+        'iterations': 310000,
+        'cipher': 'AES-256-GCM',
+        'salt': base64Encode(salt),
+        'nonce': base64Encode(encrypted.nonce),
+        'mac': base64Encode(encrypted.mac.bytes),
+        'ciphertext': base64Encode(encrypted.cipherText),
+      });
+
+      await expectLater(
+        SecureBackupService.instance.restoreBackup(
+          Uint8List.fromList(utf8.encode(envelope)),
+          'different-backup-password',
+        ),
+        throwsA(isA<SecretBoxAuthenticationError>()),
+      );
+    });
+  });
+
 }

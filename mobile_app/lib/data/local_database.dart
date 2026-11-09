@@ -464,16 +464,31 @@ class LocalDatabase {
     if (!allowed.contains(table)) throw ArgumentError('Unsupported import table');
     final db = await database;
     final rows = await db.rawQuery('PRAGMA table_info($table)');
-    return rows.map((row) => row['name'].toString())
+    final columns = rows.map((row) => row['name'].toString())
       .where((name) => !{'id', 'created_at', 'updated_at', 'is_archived'}.contains(name))
       .toList();
+    final custom = await db.query('field_definitions', columns: ['id'],
+      where: 'module = ? AND is_active = 1', whereArgs: [table], orderBy: 'sort_order, label');
+    columns.addAll(custom.map((field) => 'custom:${field['id']}'));
+    return columns;
   }
 
   Future<List<Map<String, Object?>>> exportRegisterRows(String table) async {
     const allowed = {'cases', 'dak_register', 'remand_register', 'address_book'};
     if (!allowed.contains(table)) throw ArgumentError('Unsupported export table');
     final db = await database;
-    return db.query(table, orderBy: 'created_at DESC');
+    final rows = await db.query(table, orderBy: 'created_at DESC');
+    final fields = await db.query('field_definitions', columns: ['id', 'label'],
+      where: 'module = ? AND is_active = 1', whereArgs: [table], orderBy: 'sort_order, label');
+    for (final row in rows) {
+      final values = await db.query('custom_field_values',
+        where: 'module = ? AND record_id = ?', whereArgs: [table, row['id']]);
+      for (final field in fields) {
+        final value = values.where((v) => v['field_id'] == field['id']).toList();
+        row[field['label'].toString()] = value.isEmpty ? '' : (value.first['value'] ?? '');
+      }
+    }
+    return rows;
   }
 
   /// Imports rows atomically. Existing records are never overwritten.
@@ -488,10 +503,18 @@ class LocalDatabase {
     await db.transaction((txn) async {
       for (final source in rows) {
         final values = <String, Object?>{};
+        final customValues = <String, String>{};
         for (final entry in source.entries) {
-          if (columns.contains(entry.key) && entry.value != null) values[entry.key] = entry.value;
+          if (entry.key.startsWith('custom:')) {
+            final fieldId = entry.key.substring(7);
+            if (entry.value != null && entry.value.toString().trim().isNotEmpty) {
+              customValues[fieldId] = entry.value.toString().trim();
+            }
+          } else if (columns.contains(entry.key) && entry.value != null) {
+            values[entry.key] = entry.value;
+          }
         }
-        if (values.values.every((v) => v.toString().trim().isEmpty)) {
+        if (values.values.every((v) => v.toString().trim().isEmpty) && customValues.isEmpty) {
           skipped++;
           continue;
         }
@@ -520,6 +543,13 @@ class LocalDatabase {
             'created_at': now,
             if (table == 'cases' || table == 'dak_register') 'updated_at': now,
           }, conflictAlgorithm: ConflictAlgorithm.abort);
+          for (final entry in customValues.entries) {
+            await txn.insert('custom_field_values', {
+              'id': '${table}_${id}_${entry.key}', 'module': table,
+              'record_id': id, 'field_id': entry.key, 'value': entry.value,
+              'updated_at': now,
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
           imported++;
         } catch (_) { errors++; }
       }

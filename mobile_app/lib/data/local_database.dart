@@ -472,6 +472,27 @@ class LocalDatabase {
     final db = await database;
     final now = DateTime.now().toIso8601String();
     await db.transaction((txn) async {
+      final history = await txn.query(
+        'document_versions', where: 'document_id = ?', whereArgs: [documentId], limit: 1,
+      );
+      if (history.isEmpty) {
+        // Preserve the pre-existing file as version 1 for records created before history tracking.
+        final current = await txn.query(
+          'case_documents', where: 'id = ?', whereArgs: [documentId], limit: 1,
+        );
+        if (current.isNotEmpty) {
+          final old = current.first;
+          await txn.insert('document_versions', {
+            'id': '${documentId}_legacy_v1',
+            'document_group_id': groupId,
+            'document_id': documentId,
+            'version_number': old['version'] ?? 1,
+            'local_path': old['local_path'] ?? '',
+            'change_remarks': 'पहले से मौजूद मूल संस्करण',
+            'created_at': old['created_at'] ?? now,
+          });
+        }
+      }
       await txn.insert('document_versions', {
         'id': id, 'document_group_id': groupId, 'document_id': documentId,
         'version_number': version, 'local_path': path,

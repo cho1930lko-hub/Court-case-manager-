@@ -69,8 +69,6 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
     required String label,
     required bool visible,
     required ValueChanged<bool> onVisibilityChanged,
-    String? Function(String?)? validator,
-    String? errorText,
   }) {
     return TextFormField(
       controller: controller,
@@ -79,7 +77,7 @@ class _ChangePinScreenState extends State<ChangePinScreen> {
       textInputAction: TextInputAction.next,
       maxLength: 8,
       autovalidateMode: AutovalidateMode.onUserInteraction,
-      validator: validator ?? _validatePin,
+      validator: _validatePin,
       decoration: InputDecoration(
         labelText: label,
         hintText: '6–8 अंक',

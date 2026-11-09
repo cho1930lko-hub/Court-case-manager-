@@ -57,6 +57,7 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
   Future<void> _addFile() async {
     if (_caseId == null || _adding) return;
     setState(() => _adding = true);
+    String? copiedPath;
     try {
       final picked = await FilePicker.platform.pickFiles(withData: false);
       if (picked == null || picked.files.single.path == null) return;
@@ -66,6 +67,7 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
       await folder.create(recursive: true);
       final id = const Uuid().v4();
       final destination = p.join(folder.path, '${id}_${p.basename(source.path)}');
+      copiedPath = destination;
       await source.copy(destination);
       final extension = p.extension(source.path).replaceFirst('.', '').toUpperCase();
       await LocalDatabase.instance.addCaseDocument(
@@ -73,9 +75,13 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
         category: extension.isEmpty ? 'FILE' : extension,
         path: destination, groupId: id,
       );
-      await LocalDatabase.instance.logAction('DOCUMENT_ATTACHED', 'CASE_DOCUMENTS', id, picked.files.single.name);
+      copiedPath = null;
       await _load();
     } catch (e) {
+      if (copiedPath != null) {
+        final copied = File(copiedPath);
+        if (await copied.exists()) await copied.delete();
+      }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('दस्तावेज जोड़ने में समस्या: $e')));
     } finally {
       if (mounted) setState(() => _adding = false);
@@ -99,6 +105,7 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
       ),
     );
     if (confirmed != true) { remarks.dispose(); return; }
+    String? copiedPath;
     try {
       final picked = await FilePicker.platform.pickFiles(withData: false);
       if (picked == null || picked.files.single.path == null) return;
@@ -109,17 +116,20 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
       final id = const Uuid().v4();
       final version = (doc['version'] as int? ?? 1) + 1;
       final destination = p.join(folder.path, '${id}_${p.basename(source.path)}');
+      copiedPath = destination;
       await source.copy(destination);
       await LocalDatabase.instance.addDocumentVersion(
         id: id, groupId: doc['document_group_id'].toString(),
         documentId: doc['id'].toString(), version: version, path: destination,
         remarks: remarks.text.trim().isEmpty ? 'नया संस्करण जोड़ा गया' : remarks.text.trim(),
       );
-      await LocalDatabase.instance.logAction(
-        'DOCUMENT_VERSION_ADDED', 'CASE_DOCUMENTS', doc['id'].toString(), 'Version $version',
-      );
+      copiedPath = null;
       await _load();
     } catch (e) {
+      if (copiedPath != null) {
+        final copied = File(copiedPath);
+        if (await copied.exists()) await copied.delete();
+      }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('नया संस्करण जोड़ने में समस्या: $e')),
       );

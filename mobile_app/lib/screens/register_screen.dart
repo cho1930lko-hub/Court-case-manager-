@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+
 import '../data/local_database.dart';
+import '../theme/app_theme.dart';
 
 class RegisterField {
   const RegisterField(this.key, this.label, {this.lines = 1, this.required = false});
@@ -65,6 +67,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   List<Map<String, Object?>> _rows = [];
   bool _loading = true;
 
+  IconData get _icon {
+    if (widget.config.table == 'dak_register') return Icons.mark_email_unread_rounded;
+    if (widget.config.table == 'remand_register') return Icons.assignment_turned_in_rounded;
+    return Icons.contact_phone_rounded;
+  }
+
+  Color get _accent {
+    if (widget.config.table == 'dak_register') return AppTheme.teal;
+    if (widget.config.table == 'remand_register') return const Color(0xFFC47B28);
+    return const Color(0xFF7655B5);
+  }
+
+  String get _description {
+    if (widget.config.table == 'dak_register') return 'प्राप्त डाक, संबंधित व्यक्ति और न्यायालयीन पत्राचार';
+    if (widget.config.table == 'remand_register') return 'रिमांड की तारीख, मुकदमा और अभियुक्त का विवरण';
+    return 'अधिकारी, गवाह और विभागीय संपर्क विवरण';
+  }
+
   @override
   void initState() { super.initState(); _load(); _search.addListener(_load); }
 
@@ -80,6 +100,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _edit([Map<String, Object?>? row]) async {
     final result = await showModalBottomSheet<Map<String, Object?>>(
       context: context, isScrollControlled: true, useSafeArea: true,
+      backgroundColor: AppTheme.canvas,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => _RegisterForm(config: widget.config, initial: row));
     if (result == null) return;
     final id = (row?['id'] ?? const Uuid().v4()).toString();
@@ -99,35 +121,125 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final config = widget.config;
     return Scaffold(
-      appBar: AppBar(title: Text(config.title)),
+      appBar: AppBar(title: Text(config.title), actions: [
+        IconButton(tooltip: 'रीफ्रेश', onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
+        const SizedBox(width: 4),
+      ]),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _edit(), icon: const Icon(Icons.add), label: const Text('नई एंट्री')),
+        onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('नई एंट्री')),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 8), child: TextField(
-          controller: _search,
-          decoration: InputDecoration(hintText: 'रिकॉर्ड खोजें...', prefixIcon: const Icon(Icons.search),
-            suffixIcon: IconButton(onPressed: _search.clear, icon: const Icon(Icons.close)),
-            filled: true, fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)))),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 19, 18, 18),
+          decoration: const BoxDecoration(color: AppTheme.navy,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(width: 46, height: 46,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: .13), borderRadius: BorderRadius.circular(14)),
+                child: Icon(_icon, color: Colors.white, size: 23)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(config.title, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 3),
+                Text(_description, style: const TextStyle(color: Color(0xFFD4DEED), fontSize: 11)),
+              ])),
+            ]),
+            const SizedBox(height: 16),
+            Row(children: [
+              const Icon(Icons.folder_copy_outlined, size: 16, color: Color(0xFFB8F1DD)),
+              const SizedBox(width: 6),
+              Text('${_rows.length} रिकॉर्ड', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 13),
+            TextField(
+              controller: _search,
+              style: const TextStyle(color: AppTheme.ink),
+              decoration: InputDecoration(
+                hintText: 'इस रजिस्टर में खोजें...',
+                prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.muted),
+                suffixIcon: _search.text.isEmpty ? null : IconButton(onPressed: _search.clear, icon: const Icon(Icons.close_rounded)),
+                filled: true, fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+              ),
+            ),
+          ]),
+        ),
         Expanded(child: _loading ? const Center(child: CircularProgressIndicator()) :
-          _rows.isEmpty ? const Center(child: Text('अभी कोई रिकॉर्ड नहीं है। नई एंट्री से शुरुआत करें।')) :
-          RefreshIndicator(onRefresh: _load, child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 90), itemCount: _rows.length,
+          _rows.isEmpty ? _EmptyRegister(searching: _search.text.isNotEmpty, accent: _accent,
+            onAdd: () => _edit(), onClear: _search.clear) :
+          RefreshIndicator(onRefresh: _load, child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            itemCount: _rows.length, separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final row = _rows[index];
               final title = (row[config.titleField] ?? '').toString();
-              final subtitle = config.subtitleFields.map((key) => (row[key] ?? '').toString())
-                .where((value) => value.trim().isNotEmpty).join(' • ');
-              return Card(child: ListTile(onTap: () => _edit(row),
-                leading: const CircleAvatar(child: Icon(Icons.description_outlined)),
-                title: Text(title.isEmpty ? 'बिना शीर्षक रिकॉर्ड' : title,
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(subtitle.isEmpty ? 'विवरण जोड़ने के लिए खोलें' : subtitle),
-                trailing: const Icon(Icons.edit_outlined)));
+              final details = config.subtitleFields.map((key) => (row[key] ?? '').toString())
+                .where((value) => value.trim().isNotEmpty).toList();
+              return Card(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => _edit(row),
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(width: 43, height: 43,
+                        decoration: BoxDecoration(color: _accent.withValues(alpha: .10), borderRadius: BorderRadius.circular(13)),
+                        child: Icon(_icon, color: _accent, size: 21)),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(title.isEmpty ? 'बिना शीर्षक रिकॉर्ड' : title,
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.ink)),
+                        const SizedBox(height: 6),
+                        if (details.isEmpty)
+                          const Text('विवरण जोड़ने के लिए खोलें', style: TextStyle(fontSize: 12, color: AppTheme.muted))
+                        else
+                          ...details.map((value) => Padding(
+                            padding: const EdgeInsets.only(bottom: 3),
+                            child: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12, color: AppTheme.muted)),
+                          )),
+                      ])),
+                      const SizedBox(width: 5),
+                      const Icon(Icons.chevron_right_rounded, color: AppTheme.muted),
+                    ]),
+                  ),
+                ),
+              );
             }))),
       ]),
     );
   }
+}
+
+class _EmptyRegister extends StatelessWidget {
+  const _EmptyRegister({required this.searching, required this.accent, required this.onAdd, required this.onClear});
+  final bool searching;
+  final Color accent;
+  final VoidCallback onAdd, onClear;
+
+  @override
+  Widget build(BuildContext context) => Center(child: Padding(
+    padding: const EdgeInsets.all(30),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: accent.withValues(alpha: .10), borderRadius: BorderRadius.circular(22)),
+        child: Icon(Icons.inbox_outlined, size: 38, color: accent)),
+      const SizedBox(height: 16),
+      Text(searching ? 'कोई रिकॉर्ड नहीं मिला' : 'रजिस्टर अभी खाली है',
+        style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 6),
+      Text(searching ? 'दूसरे शब्दों से खोजकर देखें।' : 'नई एंट्री जोड़कर रजिस्टर शुरू करें।',
+        textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+      const SizedBox(height: 16),
+      if (searching)
+        OutlinedButton.icon(onPressed: onClear, icon: const Icon(Icons.close), label: const Text('खोज हटाएँ'))
+      else
+        FilledButton.icon(onPressed: onAdd, icon: const Icon(Icons.add), label: const Text('नई एंट्री')),
+    ]),
+  ));
 }
 
 class _RegisterForm extends StatefulWidget {
@@ -153,24 +265,55 @@ class _RegisterFormState extends State<_RegisterForm> {
   @override
   void dispose() { for (final c in _controllers.values) { c.dispose(); } super.dispose(); }
 
+  IconData _fieldIcon(String key) {
+    switch (key) {
+      case 'st_no': return Icons.numbers_rounded;
+      case 'fir_no': return Icons.folder_outlined;
+      case 'name': return Icons.person_outline;
+      case 'mobile': return Icons.phone_outlined;
+      case 'address':
+      case 'person_address': return Icons.location_on_outlined;
+      case 'court_name': return Icons.account_balance_outlined;
+      case 'remand_date':
+      case 'first_remand_date':
+      case 'hearing_date':
+      case 'station_received_date': return Icons.calendar_month_outlined;
+      case 'remarks':
+      case 'accused_details': return Icons.notes_rounded;
+      default: return Icons.edit_note_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(18, 18, 18, MediaQuery.of(context).viewInsets.bottom + 18),
+    padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).viewInsets.bottom + 16),
     child: Form(key: _formKey, child: SingleChildScrollView(child: Column(
-      mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Center(child: Container(width: 38, height: 4,
+          decoration: BoxDecoration(color: AppTheme.line, borderRadius: BorderRadius.circular(4)))),
+        const SizedBox(height: 16),
         Text(widget.initial == null ? 'नई एंट्री जोड़ें' : 'एंट्री संशोधित करें',
-          style: Theme.of(context).textTheme.titleLarge),
+          style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 4),
+        Text(widget.config.title, style: const TextStyle(color: AppTheme.muted, fontSize: 13)),
+        const SizedBox(height: 18),
+        Card(child: Padding(padding: const EdgeInsets.all(15), child: Column(
+          children: [
+            for (final field in widget.config.fields)
+              Padding(padding: const EdgeInsets.only(bottom: 12), child: TextFormField(
+                controller: _controllers[field.key], maxLines: field.lines,
+                keyboardType: field.key == 'mobile' ? TextInputType.phone : TextInputType.text,
+                decoration: InputDecoration(labelText: field.required ? '${field.label} *' : field.label,
+                  prefixIcon: Icon(_fieldIcon(field.key), size: 19)),
+                validator: field.required ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null : null)),
+          ],
+        ))),
         const SizedBox(height: 14),
-        for (final field in widget.config.fields)
-          Padding(padding: const EdgeInsets.only(bottom: 10), child: TextFormField(
-            controller: _controllers[field.key], maxLines: field.lines,
-            decoration: InputDecoration(labelText: field.label, border: const OutlineInputBorder()),
-            validator: field.required ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null : null)),
         FilledButton.icon(onPressed: () {
           if (!_formKey.currentState!.validate()) return;
           Navigator.pop(context, {for (final e in _controllers.entries) e.key: e.value.text.trim()});
-        }, icon: const Icon(Icons.save), label: const Text('सेव करें')),
+        }, icon: const Icon(Icons.save_rounded), label: const Text('रिकॉर्ड सेव करें')),
       ],
     ))),
   );

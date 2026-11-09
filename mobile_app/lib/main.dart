@@ -9,6 +9,7 @@ import 'screens/case_documents_screen.dart';
 import 'screens/audit_log_screen.dart';
 import 'screens/backup_screen.dart';
 import 'screens/change_pin_screen.dart';
+import 'screens/global_search_screen.dart';
 import 'services/app_lock_service.dart';
 import 'theme/app_theme.dart';
 
@@ -303,6 +304,11 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: Colors.white70)),
         ]),
         actions: [
+          IconButton(
+            onPressed: () => _open(const GlobalSearchScreen()),
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'सभी रिकॉर्ड में खोज',
+          ),
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded), tooltip: 'रिफ्रेश'),
           const SizedBox(width: 4),
         ],
@@ -397,6 +403,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 25),
                 _sectionHeading('मुख्य कार्य', 'रजिस्टर और सुविधाएँ'),
                 const SizedBox(height: 12),
+                _ModuleTile(
+                  icon: Icons.search_rounded,
+                  title: 'सभी रिकॉर्ड में खोज',
+                  subtitle: 'मुकदमे, डाक, रिमांड, संपर्क और दस्तावेज एक साथ खोजें',
+                  color: AppTheme.teal,
+                  onTap: () => _open(const GlobalSearchScreen()),
+                ),
                 _ModuleTile(icon: Icons.account_balance_rounded, title: 'सेशन कोर्ट', subtitle: 'मुकदमे, पेशी, गवाह और स्थिति', color: AppTheme.blue, onTap: () => _open(const CasesScreen())),
                 _ModuleTile(icon: Icons.mark_email_unread_rounded, title: 'डाक रजिस्टर', subtitle: 'डाक प्रविष्टि, स्थिति और खोज', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: dakConfig))),
                 _ModuleTile(icon: Icons.assignment_rounded, title: 'रिमांड रजिस्टर', subtitle: 'रिमांड संबंधी विवरण', color: AppTheme.blue, onTap: () => _open(const RegisterScreen(config: remandConfig))),

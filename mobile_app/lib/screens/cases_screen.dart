@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/local_database.dart';
 import '../theme/app_theme.dart';
-import 'import_export_screen.dart';
+import 'data_input_screen.dart';
 
 class CasesScreen extends StatefulWidget {
   const CasesScreen({super.key});
@@ -140,7 +140,7 @@ class _CasesScreenState extends State<CasesScreen> {
       appBar: AppBar(
         title: const Text('सेशन कोर्ट'),
         actions: [
-          IconButton(tooltip: 'Excel Import / Export', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ImportExportScreen(initialModule: 'cases'))), icon: const Icon(Icons.import_export_rounded)),
+          IconButton(tooltip: 'Excel Import / Export', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DataInputScreen(initialModule: 'cases'))), icon: const Icon(Icons.import_export_rounded)),
           IconButton(tooltip: 'रीफ्रेश', onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
           const SizedBox(width: 4),
         ],

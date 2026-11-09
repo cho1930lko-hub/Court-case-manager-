@@ -86,7 +86,7 @@ class _CourtDocumentsScreenState extends State<CourtDocumentsScreen> {
       appBar: AppBar(title: const Text('समन एवं कार्यवाही आख्या')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         DropdownButtonFormField<String>(
-          value: _type,
+          initialValue: _type,
           decoration: const InputDecoration(labelText: 'दस्तावेज का प्रकार', border: OutlineInputBorder()),
           items: const ['समन', 'कार्यवाही आख्या'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
           onChanged: (v) => setState(() { _type = v ?? _type; _preview = ''; }),
@@ -94,7 +94,7 @@ class _CourtDocumentsScreenState extends State<CourtDocumentsScreen> {
         const SizedBox(height: 12),
         if (_cases.isEmpty) const Text('पहले Session Court में मुकदमा जोड़ें।') else
           DropdownButtonFormField<String>(
-            value: _caseId, isExpanded: true,
+            initialValue: _caseId, isExpanded: true,
             decoration: const InputDecoration(labelText: 'मुकदमा चुनें', border: OutlineInputBorder()),
             items: _cases.map((c) => DropdownMenuItem(
               value: c['id'].toString(),

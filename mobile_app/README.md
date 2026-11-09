@@ -10,14 +10,25 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Export/import and backup will be implemented as explicit user actions.
 - Existing registers and V2 modules will be migrated incrementally.
 
-## Current scaffold
+## Phase 1 progress
 
-- Flutter Material 3 dashboard.
-- Local SQLite database initialization.
-- Initial schema for Session Court, Dak, Remand, Address Book, documents, timeline, checklist, analysis, drafts, versions, audit log, and app settings.
-- Dashboard counts.
+- Dashboard with live counts for cases, Dak, Remand, documents, and contacts.
+- Session Court: initial add, edit, search, and soft-archive workflow.
+- Dak Register: add, edit, and search.
+- Remand Register: add, edit, and search.
+- Address Book: add, edit, and search.
+- Local SQLite CRUD helpers and audit entries for register changes.
+- GitHub Actions workflow added for Flutter dependency resolution and static analysis.
 
-This is a foundation, not a completed replacement APK. Register CRUD screens, attachments, import/export, backup/restore, database encryption, and migration verification remain to be implemented and tested.
+## Still pending
+
+- Full field-by-field parity with the existing Streamlit registers.
+- Review and validation of date fields, duplicate rules, and required fields.
+- Automated tests and actual Android-device testing.
+- Android platform project generation and release APK build.
+- Attachments/photos, Excel import/export, and backup/restore.
+- Database encryption, app lock, backup encryption, restore validation, and device-loss recovery.
+- Legacy data import and row-count reconciliation.
 
 ## Build
 
@@ -30,11 +41,11 @@ flutter test
 flutter build apk --release
 ```
 
-The release APK is generated at `build/app/outputs/flutter-apk/app-release.apk`.
+The release APK is generated at `build/app/outputs/flutter-apk/app-release.apk` after Android platform files are generated.
 
 ## Data safety
 
-The database is currently an initial SQLite scaffold. Before real police/court records are entered, database encryption, app lock, backup encryption, restore validation, and device-loss recovery must be implemented and tested. Do not use this scaffold for production records yet.
+The database is currently an initial SQLite implementation and is not encrypted. Before real police/court records are entered, database encryption, app lock, backup encryption, restore validation, and device-loss recovery must be implemented and tested. Do not use this build for production records yet.
 
 ## Migration policy
 

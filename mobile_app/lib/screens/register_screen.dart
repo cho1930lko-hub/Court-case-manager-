@@ -285,36 +285,92 @@ class _RegisterFormState extends State<_RegisterForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).viewInsets.bottom + 16),
-    child: Form(key: _formKey, child: SingleChildScrollView(child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Center(child: Container(width: 38, height: 4,
-          decoration: BoxDecoration(color: AppTheme.line, borderRadius: BorderRadius.circular(4)))),
-        const SizedBox(height: 16),
-        Text(widget.initial == null ? 'नई एंट्री जोड़ें' : 'एंट्री संशोधित करें',
-          style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 4),
-        Text(widget.config.title, style: const TextStyle(color: AppTheme.muted, fontSize: 13)),
-        const SizedBox(height: 18),
-        Card(child: Padding(padding: const EdgeInsets.all(15), child: Column(
-          children: [
-            for (final field in widget.config.fields)
-              Padding(padding: const EdgeInsets.only(bottom: 12), child: TextFormField(
-                controller: _controllers[field.key], maxLines: field.lines,
-                keyboardType: field.key == 'mobile' ? TextInputType.phone : TextInputType.text,
-                decoration: InputDecoration(labelText: field.required ? '${field.label} *' : field.label,
-                  prefixIcon: Icon(_fieldIcon(field.key), size: 19)),
-                validator: field.required ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null : null)),
-          ],
-        ))),
-        const SizedBox(height: 14),
-        FilledButton.icon(onPressed: () {
-          if (!_formKey.currentState!.validate()) return;
-          Navigator.pop(context, {for (final e in _controllers.entries) e.key: e.value.text.trim()});
-        }, icon: const Icon(Icons.save_rounded), label: const Text('रिकॉर्ड सेव करें')),
-      ],
-    ))),
-  );
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, keyboardInset + 12),
+        child: Form(
+          key: _formKey,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .88),
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(child: Container(width: 38, height: 4,
+                        decoration: BoxDecoration(color: AppTheme.line, borderRadius: BorderRadius.circular(4)))),
+                      const SizedBox(height: 16),
+                      Text(widget.initial == null ? 'नई एंट्री जोड़ें' : 'एंट्री संशोधित करें',
+                        style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 4),
+                      Text(widget.config.title, style: const TextStyle(color: AppTheme.muted, fontSize: 13)),
+                      const SizedBox(height: 18),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(15),
+                          child: Column(
+                            children: [
+                              for (final field in widget.config.fields)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: TextFormField(
+                                    controller: _controllers[field.key],
+                                    maxLines: field.lines,
+                                    textInputAction: field.lines > 1 ? TextInputAction.newline : TextInputAction.next,
+                                    keyboardType: field.key == 'mobile' ? TextInputType.phone : TextInputType.text,
+                                    decoration: InputDecoration(
+                                      labelText: field.required ? '${field.label} *' : field.label,
+                                      alignLabelWithHint: field.lines > 1,
+                                      prefixIcon: Icon(_fieldIcon(field.key), size: 19),
+                                    ),
+                                    validator: field.required
+                                        ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null
+                                        : null,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('रद्द करें'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                if (!_formKey.currentState!.validate()) return;
+                                Navigator.pop(context, {
+                                  for (final e in _controllers.entries) e.key: e.value.text.trim(),
+                                });
+                              },
+                              icon: const Icon(Icons.save_rounded),
+                              label: const Text('रिकॉर्ड सेव करें'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

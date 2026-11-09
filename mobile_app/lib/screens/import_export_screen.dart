@@ -58,6 +58,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
 
   String _module = 'cases';
   List<String> _columns = [];
+  Map<String, String> _columnLabels = {};
   List<String> _headers = [];
   List<List<String>> _sourceRows = [];
   Map<int, String?> _mapping = {};
@@ -73,8 +74,13 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
 
   Future<void> _loadColumns() async {
     final cols = await LocalDatabase.instance.importableColumns(_module);
+    final fields = await LocalDatabase.instance.getFieldDefinitions(_module);
+    final labels = <String, String>{for (final c in cols) c: c};
+    for (final field in fields) {
+      labels['custom:${field['id']}'] = '${field['label']} (Custom)';
+    }
     if (!mounted) return;
-    setState(() { _columns = cols; _headers = []; _sourceRows = []; _mapping = {}; _result = null; });
+    setState(() { _columns = cols; _columnLabels = labels; _headers = []; _sourceRows = []; _mapping = {}; _result = null; });
   }
 
   String _norm(String value) => value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9ऀ-ॿ]+'), '').trim();
@@ -254,7 +260,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
             Expanded(flex: 6, child: DropdownButtonFormField<String>(
               initialValue: _mapping[i], isExpanded: true, decoration: const InputDecoration(isDense: true),
               items: [const DropdownMenuItem<String>(value: '', child: Text('छोड़ें')),
-                ..._columns.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis)))],
+                ..._columns.map((c) => DropdownMenuItem(value: c, child: Text(_columnLabels[c] ?? c, overflow: TextOverflow.ellipsis)))],
               onChanged: (v) async { setState(() => _mapping[i] = (v == null || v.isEmpty) ? null : v); await _analyseRows(); },
             )),
           ]),

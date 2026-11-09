@@ -12,6 +12,13 @@ on:
       - 'mobile_app/**'
       - '.github/workflows/flutter-check.yml'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-check-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze-test-android:
     runs-on: ubuntu-latest
@@ -92,6 +99,8 @@ jobs:
         run: |
           mkdir -p android/app
           printf '%s\n' '-keep class net.sqlcipher.** { *; }' >> android/app/proguard-rules.pro
+      - name: Harden Android project (no auto-backup, FLAG_SECURE)
+        run: python3 tool/harden_android.py
       - name: Build debug APK
         run: flutter build apk --debug
       - uses: actions/upload-artifact@v4

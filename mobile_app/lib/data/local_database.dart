@@ -457,6 +457,83 @@ class LocalDatabase {
     return {for (final row in rows) row['field_id'].toString(): (row['value'] ?? '').toString()};
   }
 
+
+  Future<List<String>> importableColumns(String table) async {
+    const allowed = {'cases', 'dak_register', 'remand_register', 'address_book'};
+    if (!allowed.contains(table)) throw ArgumentError('Unsupported import table');
+    final db = await database;
+    final rows = await db.rawQuery('PRAGMA table_info($table)');
+    return rows.map((row) => row['name'].toString())
+      .where((name) => !{'id', 'created_at', 'updated_at', 'is_archived'}.contains(name))
+      .toList();
+  }
+
+  Future<List<Map<String, Object?>>> exportRegisterRows(String table) async {
+    const allowed = {'cases', 'dak_register', 'remand_register', 'address_book'};
+    if (!allowed.contains(table)) throw ArgumentError('Unsupported export table');
+    final db = await database;
+    return db.query(table, orderBy: 'created_at DESC');
+  }
+
+  /// Imports rows atomically. Existing records are never overwritten.
+  Future<Map<String, int>> importRegisterRows(String table,
+      List<Map<String, Object?>> rows, {required String sourceName}) async {
+    const allowed = {'cases', 'dak_register', 'remand_register', 'address_book'};
+    if (!allowed.contains(table)) throw ArgumentError('Unsupported import table');
+    final db = await database;
+    final columns = await importableColumns(table);
+    final now = DateTime.now().toIso8601String();
+    var imported = 0, skipped = 0, errors = 0;
+    await db.transaction((txn) async {
+      for (final source in rows) {
+        final values = <String, Object?>{};
+        for (final entry in source.entries) {
+          if (columns.contains(entry.key) && entry.value != null) values[entry.key] = entry.value;
+        }
+        if (values.values.every((v) => v.toString().trim().isEmpty)) {
+          skipped++;
+          continue;
+        }
+        try {
+          final id = (values.remove('id') ?? '${DateTime.now().microsecondsSinceEpoch}-$imported').toString();
+          final duplicate = switch (table) {
+            'cases' => (values['st_no']?.toString().trim().isNotEmpty ?? false)
+              ? await txn.query(table, columns: ['id'], where: 'st_no = ?', whereArgs: [values['st_no'].toString()], limit: 1)
+              : <Map<String, Object?>>[],
+            'address_book' => (values['mobile']?.toString().trim().isNotEmpty ?? false)
+              ? await txn.query(table, columns: ['id'], where: 'mobile = ?', whereArgs: [values['mobile'].toString()], limit: 1)
+              : <Map<String, Object?>>[],
+            'remand_register' => (values['fir_no']?.toString().trim().isNotEmpty ?? false)
+              ? await txn.query(table, columns: ['id'], where: 'fir_no = ? AND remand_date = ?',
+                  whereArgs: [values['fir_no'].toString(), values['remand_date']?.toString() ?? ''], limit: 1)
+              : <Map<String, Object?>>[],
+            _ => (values['st_no']?.toString().trim().isNotEmpty ?? false)
+              ? await txn.query(table, columns: ['id'], where: 'st_no = ? AND dak_type = ?',
+                  whereArgs: [values['st_no'].toString(), values['dak_type']?.toString() ?? ''], limit: 1)
+              : <Map<String, Object?>>[],
+          };
+          if (duplicate.isNotEmpty) { skipped++; continue; }
+          await txn.insert(table, {
+            ...values,
+            'id': id,
+            'created_at': now,
+            if (table == 'cases' || table == 'dak_register') 'updated_at': now,
+          }, conflictAlgorithm: ConflictAlgorithm.abort);
+          imported++;
+        } catch (_) { errors++; }
+      }
+      await _insertAudit(txn, 'BULK_IMPORT_COMPLETED', table, '',
+        'source=$sourceName; imported=$imported; skipped=$skipped; errors=$errors');
+      await txn.insert('import_history', {
+        'id': '${DateTime.now().microsecondsSinceEpoch}',
+        'module': table, 'source_name': sourceName, 'total_rows': rows.length,
+        'imported_rows': imported, 'skipped_rows': skipped, 'error_rows': errors,
+        'created_at': now,
+      });
+    });
+    return {'total': rows.length, 'imported': imported, 'skipped': skipped, 'errors': errors};
+  }
+
   Future<Map<String, int>> dashboardCounts() async {
     final db = await database;
     Future<int> count(String table) async =>

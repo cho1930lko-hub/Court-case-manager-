@@ -32,6 +32,7 @@ class LocalDatabase {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createGeneratedDocumentsTable(db);
         if (oldVersion < 3) await _createEvidenceTable(db);
+        if (oldVersion < 4) await _createDynamicFieldTables(db);
         if (oldVersion < 4) await _createDynamicDataTables(db);
       },
     );
@@ -299,6 +300,161 @@ class LocalDatabase {
         FOREIGN KEY(case_id) REFERENCES cases(id)
       )
     ''');
+  }
+
+
+  /// Additive metadata layer for user-configurable fields and dropdowns.
+  /// Existing register columns and records remain untouched.
+  Future<void> _createDynamicFieldTables(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS field_definitions (
+        id TEXT PRIMARY KEY,
+        module TEXT NOT NULL,
+        field_key TEXT NOT NULL,
+        label TEXT NOT NULL,
+        data_type TEXT NOT NULL DEFAULT 'text',
+        is_required INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        is_system INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        allowed_roles TEXT NOT NULL DEFAULT 'admin,staff',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(module, field_key)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS field_options (
+        id TEXT PRIMARY KEY,
+        field_id TEXT NOT NULL,
+        option_label TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(field_id) REFERENCES field_definitions(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS custom_field_values (
+        id TEXT PRIMARY KEY,
+        module TEXT NOT NULL,
+        record_id TEXT NOT NULL,
+        field_id TEXT NOT NULL,
+        value TEXT DEFAULT '',
+        updated_at TEXT NOT NULL,
+        UNIQUE(module, record_id, field_id),
+        FOREIGN KEY(field_id) REFERENCES field_definitions(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS import_profiles (
+        id TEXT PRIMARY KEY,
+        module TEXT NOT NULL,
+        profile_name TEXT NOT NULL,
+        mapping_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS import_history (
+        id TEXT PRIMARY KEY,
+        module TEXT NOT NULL,
+        source_name TEXT NOT NULL,
+        total_rows INTEGER NOT NULL DEFAULT 0,
+        imported_rows INTEGER NOT NULL DEFAULT 0,
+        skipped_rows INTEGER NOT NULL DEFAULT 0,
+        error_rows INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_custom_values_record ON custom_field_values(module, record_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_field_definitions_module ON field_definitions(module, is_active, sort_order)');
+  }
+
+  Future<List<Map<String, Object?>>> getFieldDefinitions(String module) async {
+    final db = await database;
+    return db.query('field_definitions', where: 'module = ? AND is_active = 1',
+        whereArgs: [module], orderBy: 'sort_order, label');
+  }
+
+  Future<List<Map<String, Object?>>> getFieldOptions(String fieldId) async {
+    final db = await database;
+    return db.query('field_options', where: 'field_id = ? AND is_active = 1',
+        whereArgs: [fieldId], orderBy: 'sort_order, option_label');
+  }
+
+  Future<void> saveFieldDefinition({
+    required String id, required String module, required String fieldKey,
+    required String label, required String dataType, required bool requiredField,
+    required String allowedRoles, bool isSystem = false,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.insert('field_definitions', {
+      'id': id, 'module': module, 'field_key': fieldKey, 'label': label,
+      'data_type': dataType, 'is_required': requiredField ? 1 : 0,
+      'allowed_roles': allowedRoles, 'is_system': isSystem ? 1 : 0,
+      'created_at': now, 'updated_at': now,
+    }, conflictAlgorithm: ConflictAlgorithm.abort);
+    await logAction('FIELD_DEFINITION_CREATED', 'FIELD_MANAGER', id, '$module / $label');
+  }
+
+  Future<void> updateFieldDefinition(String id, {
+    required String label, required String dataType,
+    required bool requiredField, required String allowedRoles,
+  }) async {
+    final db = await database;
+    final changed = await db.update('field_definitions', {
+      'label': label, 'data_type': dataType,
+      'is_required': requiredField ? 1 : 0,
+      'allowed_roles': allowedRoles,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, where: 'id = ? AND is_system = 0', whereArgs: [id]);
+    if (changed != 1) throw StateError('System field cannot be modified or field not found');
+    await logAction('FIELD_DEFINITION_UPDATED', 'FIELD_MANAGER', id, label);
+  }
+
+  Future<void> addFieldOption(String id, String fieldId, String label) async {
+    final db = await database;
+    await db.insert('field_options', {
+      'id': id, 'field_id': fieldId, 'option_label': label,
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.abort);
+    await logAction('FIELD_OPTION_ADDED', 'FIELD_MANAGER', id, label);
+  }
+
+  Future<void> deactivateFieldDefinition(String id) async {
+    final db = await database;
+    final changed = await db.update('field_definitions', {
+      'is_active': 0, 'updated_at': DateTime.now().toIso8601String(),
+    }, where: 'id = ? AND is_system = 0', whereArgs: [id]);
+    if (changed != 1) throw StateError('System field cannot be deactivated or field not found');
+    await logAction('FIELD_DEFINITION_DEACTIVATED', 'FIELD_MANAGER', id, 'Soft disable');
+  }
+
+  Future<void> saveCustomFieldValues(String module, String recordId,
+      Map<String, String> values) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      for (final entry in values.entries) {
+        await txn.insert('custom_field_values', {
+          'id': '${module}_${recordId}_${entry.key}',
+          'module': module, 'record_id': recordId,
+          'field_id': entry.key, 'value': entry.value, 'updated_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await _insertAudit(txn, 'CUSTOM_FIELDS_SAVED', module, recordId,
+          '${values.length} custom field(s)');
+    });
+  }
+
+  Future<Map<String, String>> getCustomFieldValues(String module, String recordId) async {
+    final db = await database;
+    final rows = await db.query('custom_field_values',
+        where: 'module = ? AND record_id = ?', whereArgs: [module, recordId]);
+    return {for (final row in rows) row['field_id'].toString(): (row['value'] ?? '').toString()};
   }
 
   Future<Map<String, int>> dashboardCounts() async {

@@ -12,6 +12,7 @@ import 'screens/backup_screen.dart';
 import 'screens/global_search_screen.dart';
 import 'screens/evidence_screen.dart';
 import 'screens/app_lock_gate.dart';
+import 'screens/field_manager_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -314,6 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _ModuleTile(icon: Icons.folder_copy_rounded, title: 'दस्तावेज लाइब्रेरी', subtitle: 'केस फाइलें और पुराने संस्करण', color: AppTheme.teal, onTap: () => _open(const CaseDocumentsScreen())),
         _ModuleTile(icon: Icons.inventory_2_outlined, title: 'Evidence एवं Exhibit Manager', subtitle: 'बरामदगी, मालखाना, सील, Exhibit और संलग्न फाइलें', color: AppTheme.teal, onTap: () => _open(const EvidenceScreen())),
         _ModuleTile(icon: Icons.security_rounded, title: 'Audit Log', subtitle: 'ऐप में दर्ज गतिविधियों का रिकॉर्ड', color: AppTheme.blue, onTap: () => _open(const AuditLogScreen())),
+        _ModuleTile(icon: Icons.tune_rounded, title: 'Dynamic Field Manager', subtitle: 'नए फील्ड, Dropdown और फील्ड अधिकार नियंत्रित करें', color: AppTheme.blue, onTap: () => _open(const FieldManagerScreen())),
         const SizedBox(height: 16),
         Text('सुरक्षा एवं बैकअप', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 10),

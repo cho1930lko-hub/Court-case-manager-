@@ -287,6 +287,46 @@ class _RegisterFormState extends State<_RegisterForm> {
     }
   }
 
+  bool _isDateField(String key) => const {
+    'remand_date', 'first_remand_date', 'hearing_date', 'station_received_date',
+  }.contains(key);
+
+  Future<void> _pickDate(String key) async {
+    final controller = _controllers[key]!;
+    DateTime initial = DateTime.now();
+    final raw = controller.text.trim();
+    final parts = raw.split('/');
+    if (parts.length == 3) {
+      final day = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      final year = int.tryParse(parts[2]);
+      if (day != null && month != null && year != null) {
+        final candidate = DateTime(year, month, day);
+        if (candidate.day == day && candidate.month == month && candidate.year == year) initial = candidate;
+      }
+    } else {
+      initial = DateTime.tryParse(raw) ?? initial;
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1990),
+      lastDate: DateTime(2100),
+      helpText: 'दिनांक चुनें',
+      cancelText: 'रद्द करें',
+      confirmText: 'चुनें',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(colorScheme: Theme.of(context).colorScheme.copyWith(primary: AppTheme.blue)),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final day = picked.day.toString().padLeft(2, '0');
+    final month = picked.month.toString().padLeft(2, '0');
+    controller.text = '$day/$month/${picked.year}';
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
@@ -327,10 +367,19 @@ class _RegisterFormState extends State<_RegisterForm> {
                                     maxLines: field.lines,
                                     textInputAction: field.lines > 1 ? TextInputAction.newline : TextInputAction.next,
                                     keyboardType: field.key == 'mobile' ? TextInputType.phone : TextInputType.text,
+                                    readOnly: _isDateField(field.key),
+                                    onTap: _isDateField(field.key) ? () => _pickDate(field.key) : null,
                                     decoration: InputDecoration(
                                       labelText: field.required ? '${field.label} *' : field.label,
                                       alignLabelWithHint: field.lines > 1,
                                       prefixIcon: Icon(_fieldIcon(field.key), size: 19),
+                                      suffixIcon: _isDateField(field.key) && (_controllers[field.key]?.text.isNotEmpty ?? false)
+                                          ? IconButton(
+                                              tooltip: 'दिनांक हटाएँ',
+                                              onPressed: () => setState(() => _controllers[field.key]!.clear()),
+                                              icon: const Icon(Icons.close_rounded, size: 18),
+                                            )
+                                          : _isDateField(field.key) ? const Icon(Icons.calendar_month_outlined) : null,
                                     ),
                                     validator: field.required
                                         ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null

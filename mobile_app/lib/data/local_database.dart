@@ -158,6 +158,57 @@ class LocalDatabase {
     };
   }
 
+
+  Future<List<Map<String, Object?>>> searchCases(String query) async {
+    final db = await database;
+    final q = query.trim();
+    if (q.isEmpty) {
+      return db.query('cases', where: 'is_archived = 0', orderBy: 'CAST(st_no AS INTEGER) DESC');
+    }
+    return db.query(
+      'cases',
+      where: 'is_archived = 0 AND (st_no LIKE ? OR fir_no LIKE ? OR accused_name LIKE ? OR sections LIKE ?)',
+      whereArgs: ['%$q%', '%$q%', '%$q%', '%$q%'],
+      orderBy: 'updated_at DESC',
+    );
+  }
+
+  Future<void> saveCase(Map<String, Object?> values, {String? id}) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    if (id == null) {
+      await db.insert('cases', {
+        ...values,
+        'id': values['id'],
+        'created_at': now,
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.abort);
+    } else {
+      await db.update('cases', {...values, 'updated_at': now},
+          where: 'id = ?', whereArgs: [id]);
+    }
+  }
+
+  Future<void> archiveCase(String id) async {
+    final db = await database;
+    await db.update('cases', {
+      'is_archived': 1,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> logAction(String action, String module, String recordId, String details) async {
+    final db = await database;
+    await db.insert('audit_log', {
+      'id': DateTime.now().microsecondsSinceEpoch.toString(),
+      'action': action,
+      'module': module,
+      'record_id': recordId,
+      'details': details,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
   Future<String> databasePath() async {
     final root = await getDatabasesPath();
     return p.join(root, 'court_case_manager.db');

@@ -43,6 +43,15 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Backup includes the SQLite database and app-managed case document files.
 - Restore checks the backup format, authenticates/decrypts it, validates the SQLite header and `PRAGMA integrity_check` in a temporary database before replacing current data.
 
+## Phase 4 security implementation
+
+- Live SQLite storage now uses SQLCipher; a random 256-bit database key is stored in Android secure storage.
+- Existing plaintext SQLite files are migrated through `sqlcipher_export` to a temporary encrypted database, integrity-checked, and only then swapped into place. The original file is retained if migration fails.
+- PIN failures are throttled: after five failures, the wait grows from 30 seconds up to 15 minutes. PIN changes require the current PIN.
+- Encrypted backups include the SQLCipher database key only inside the AES-256-GCM encrypted archive, allowing restore on another device.
+- Restore authenticates/decrypts the archive, validates the encrypted database using SQLCipher, stages document files, and keeps rollback copies while swapping data.
+- For Android release builds with code shrinking, add `-keep class net.sqlcipher.** { *; }` to `android/app/proguard-rules.pro` after generating the Android platform project.
+
 ## Still pending
 
 - Full field-by-field parity with the existing Streamlit registers.
@@ -53,9 +62,9 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Android platform project generation and release APK build.
 - Officially formatted PDF/print output (Hindi font embedding is required before reliable PDF generation).
 - Dak attachments/photos, Excel import/export, and backup/restore.
-- Live SQLite database encryption at rest (current database file remains unencrypted).
-- PIN attempt throttling, recovery flow, security review, and full restore rollback testing.
-- Backup compatibility tests across app/schema versions and verification of document file completeness.
+- Android-device verification of SQLCipher migration, key storage, lockout behavior, backup portability and restore rollback.
+- PIN recovery is intentionally not bypassable: use a verified encrypted backup on a clean installation/device and set a new local PIN. The backup password and backup file must both be available.
+- Backup compatibility tests across future app/schema versions and file completeness checks.
 - Legacy data import and row-count reconciliation.
 
 ## Build
@@ -73,7 +82,7 @@ The release APK is generated at `build/app/outputs/flutter-apk/app-release.apk` 
 
 ## Data safety
 
-The live SQLite database is still not encrypted at rest. The app PIN and encrypted backup are initial implementations and have not yet passed Android-device security testing. Restore replaces current local data after a confirmation; make a separate backup first. Do not use this build for real police/court records until database encryption, lockout/recovery, backup/restore and attachment integrity have been independently tested.
+The live SQLite database uses SQLCipher and its key is stored in Android secure storage. These changes have not yet passed Android-device security testing. Keep at least two verified encrypted backups in separate safe locations. PIN reset is not bypassable; on a new device restore a verified backup and set a new PIN. If the database key is lost and no valid backup exists, local data may be unrecoverable. Do not use this build for real police/court records until the migration, key lifecycle, lockout, backup/restore, app lifecycle and attachment integrity have been tested on a physical Android device.
 
 ## Migration policy
 

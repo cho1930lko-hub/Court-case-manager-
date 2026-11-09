@@ -48,6 +48,46 @@ jobs:
           else:
               raise SystemExit("Could not find the generated Android compileSdk declaration")
           PY
+      - name: Force compile SDK 36 for Android plugin modules
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          candidates = [Path("android/build.gradle.kts"), Path("android/build.gradle")]
+          snippet_kts = """
+          // Keep Android plugin modules aligned with the app compile SDK.
+          subprojects {
+              afterEvaluate {
+                  val androidExtension = extensions.findByName("android")
+                  if (androidExtension != null) {
+                      androidExtension.javaClass.methods
+                          .firstOrNull { it.name == "setCompileSdkVersion" && it.parameterCount == 1 }
+                          ?.invoke(androidExtension, 36)
+                  }
+              }
+          }
+          """
+          snippet_groovy = """
+          // Keep Android plugin modules aligned with the app compile SDK.
+          subprojects {
+              afterEvaluate { project ->
+                  def androidExtension = project.extensions.findByName('android')
+                  if (androidExtension != null) {
+                      androidExtension.compileSdkVersion 36
+                  }
+              }
+          }
+          """
+          for path in candidates:
+              if path.exists():
+                  source = path.read_text()
+                  snippet = snippet_kts if path.suffix == ".kts" else snippet_groovy
+                  if "Keep Android plugin modules aligned" not in source:
+                      path.write_text(source.rstrip() + "\\n" + snippet)
+                  print(f"Configured plugin compile SDK in {path}")
+                  break
+          else:
+              raise SystemExit("Could not find generated Android root Gradle file")
+          PY
       - name: Add SQLCipher ProGuard keep rules
         run: |
           mkdir -p android/app

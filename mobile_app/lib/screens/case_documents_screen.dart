@@ -18,12 +18,19 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
   List<Map<String, Object?>> _documents = [];
   String? _caseId;
   String _query = '';
+  final TextEditingController _searchController = TextEditingController();
   String _category = 'सभी';
   bool _loading = true;
   bool _adding = false;
 
   @override
   void initState() { super.initState(); _load(); }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _load() async {
     final cases = await LocalDatabase.instance.searchCases('');
@@ -154,7 +161,7 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
                 ),
                 items: _cases.map((c) => DropdownMenuItem(value: c['id'].toString(),
                   child: Text('ST ${c['st_no']} • ${c['accused_name']}', overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (v) async { setState(() { _caseId = v; _loading = true; _category = 'सभी'; }); await _load(); },
+                onChanged: (v) async { setState(() { _caseId = v; _loading = true; _category = 'सभी'; _query = ''; _searchController.clear(); }); await _load(); },
               ),
             ]),
           ),
@@ -168,9 +175,10 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
           ),
           Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 10), child: TextField(
             onChanged: (v) => setState(() => _query = v),
+            controller: _searchController,
             decoration: InputDecoration(
               hintText: 'दस्तावेज़ का नाम खोजें…', prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: _query.isEmpty ? null : IconButton(onPressed: () => setState(() => _query = ''), icon: const Icon(Icons.close_rounded)),
+              suffixIcon: _query.isEmpty ? null : IconButton(onPressed: () { _searchController.clear(); setState(() => _query = ''); }, icon: const Icon(Icons.close_rounded)),
               filled: true, fillColor: Colors.white, contentPadding: const EdgeInsets.symmetric(vertical: 12),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.line)),
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.line)),
@@ -186,6 +194,7 @@ class _CaseDocumentsScreenState extends State<CaseDocumentsScreen> {
                 return ChoiceChip(label: Text(value), selected: selected,
                   onSelected: (_) => setState(() => _category = value),
                   selectedColor: AppTheme.navy, backgroundColor: Colors.white,
+                  showCheckmark: false,
                   labelStyle: TextStyle(color: selected ? Colors.white : AppTheme.muted, fontWeight: FontWeight.w600, fontSize: 12),
                   side: BorderSide(color: selected ? AppTheme.navy : AppTheme.line));
               },

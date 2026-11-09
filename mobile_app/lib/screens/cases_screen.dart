@@ -90,11 +90,21 @@ class _CasesScreenState extends State<CasesScreen> {
     );
     if (result == null) return;
     final id = (row?['id'] ?? const Uuid().v4()).toString();
+    final values = <String, Object?>{};
+    final customValues = <String, String>{};
+    for (final entry in result.entries) {
+      if (entry.key.startsWith('__custom__:')) {
+        customValues[entry.key.substring(11)] = entry.value.toString();
+      } else {
+        values[entry.key] = entry.value;
+      }
+    }
     try {
       await LocalDatabase.instance.saveWithAudit(
-        table: 'cases', values: result, recordId: id, isNew: row == null,
+        table: 'cases', values: values, recordId: id, isNew: row == null,
+        customFieldValues: customValues, customFieldModule: 'cases',
         action: row == null ? 'CASE_CREATED' : 'CASE_UPDATED',
-        module: 'SESSION_COURT', details: 'ST NO: ${result['st_no']}',
+        module: 'SESSION_COURT', details: 'ST NO: ${values['st_no']}',
       );
       await _load();
       if (mounted) {
@@ -369,6 +379,10 @@ class _CaseFormState extends State<_CaseForm> {
   late final TextEditingController nextHearing;
   late final TextEditingController action;
   String status = 'साक्ष्य';
+  List<Map<String, Object?>> customFields = [];
+  final Map<String, TextEditingController> customControllers = {};
+  final Map<String, String> customDropdowns = {};
+  final Map<String, List<Map<String, Object?>>> customOptions = {};
 
   @override
   void initState() {
@@ -383,6 +397,23 @@ class _CaseFormState extends State<_CaseForm> {
     nextHearing = TextEditingController(text: '${r['next_hearing'] ?? ''}');
     action = TextEditingController(text: '${r['action_taken'] ?? ''}');
     status = (r['status'] ?? 'साक्ष्य').toString();
+    _loadCustomFields();
+  }
+
+  Future<void> _loadCustomFields() async {
+    final fields = await LocalDatabase.instance.getFieldDefinitions('cases');
+    final values = widget.initial == null ? <String, String>{} :
+      await LocalDatabase.instance.getCustomFieldValues('cases', widget.initial!['id'].toString());
+    for (final field in fields) {
+      final id = field['id'].toString();
+      if (field['data_type'] == 'dropdown') {
+        customOptions[id] = await LocalDatabase.instance.getFieldOptions(id);
+        customDropdowns[id] = values[id] ?? '';
+      } else {
+        customControllers[id] = TextEditingController(text: values[id] ?? '');
+      }
+    }
+    if (mounted) setState(() => customFields = fields);
   }
 
   @override
@@ -390,6 +421,7 @@ class _CaseFormState extends State<_CaseForm> {
     for (final c in [stNo, firNo, sections, accused, court, witnesses, nextHearing, action]) {
       c.dispose();
     }
+    for (final controller in customControllers.values) { controller.dispose(); }
     super.dispose();
   }
 
@@ -403,6 +435,37 @@ class _CaseFormState extends State<_CaseForm> {
           validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'यह विवरण आवश्यक है' : null : null,
         ),
       );
+
+  Widget _customFieldsSection() {
+    if (customFields.isEmpty) return const SizedBox.shrink();
+    return _section('अतिरिक्त / Custom Fields', Icons.tune_rounded, [
+      for (final field in customFields) Builder(builder: (context) {
+        final id = field['id'].toString();
+        final label = field['label'].toString();
+        final requiredField = field['is_required'] == 1;
+        if (field['data_type'] == 'dropdown') {
+          final options = customOptions[id] ?? [];
+          final current = customDropdowns[id];
+          return Padding(padding: const EdgeInsets.only(bottom: 12),
+            child: DropdownButtonFormField<String>(
+              value: current != null && current.isNotEmpty && options.any((o) => o['option_label'] == current) ? current : null,
+              decoration: InputDecoration(labelText: requiredField ? '$label *' : label),
+              items: options.map((o) => DropdownMenuItem(value: o['option_label'].toString(), child: Text(o['option_label'].toString()))).toList(),
+              onChanged: (v) => setState(() => customDropdowns[id] = v ?? ''),
+              validator: requiredField ? (v) => (v == null || v.isEmpty) ? 'यह विवरण आवश्यक है' : null : null,
+            ));
+        }
+        return Padding(padding: const EdgeInsets.only(bottom: 12),
+          child: TextFormField(
+            controller: customControllers[id],
+            maxLines: field['data_type'] == 'multiline' ? 3 : 1,
+            keyboardType: field['data_type'] == 'number' ? TextInputType.number : TextInputType.text,
+            decoration: InputDecoration(labelText: requiredField ? '$label *' : label),
+            validator: requiredField ? (v) => (v == null || v.trim().isEmpty) ? 'यह विवरण आवश्यक है' : null : null,
+          ));
+      }),
+    ]);
+  }
 
   String? _validateHearingDate(String? value) {
     final text = (value ?? '').trim();
@@ -507,6 +570,8 @@ class _CaseFormState extends State<_CaseForm> {
                         const SizedBox(height: 12),
                         _field('कृत कार्यवाही', action, lines: 3, icon: Icons.edit_note_rounded),
                       ]),
+                      _customFieldsSection(),
+                      if (customFields.isNotEmpty) const SizedBox(height: 12),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -532,6 +597,8 @@ class _CaseFormState extends State<_CaseForm> {
                                   'next_hearing': nextHearing.text.trim(),
                                   'status': status,
                                   'action_taken': action.text.trim(),
+                                  for (final e in customControllers.entries) '__custom__:${e.key}': e.value.text.trim(),
+                                  for (final e in customDropdowns.entries) '__custom__:${e.key}': e.value,
                                 });
                               },
                               icon: const Icon(Icons.save_rounded),

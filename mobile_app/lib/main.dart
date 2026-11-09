@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
@@ -273,6 +274,17 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
             const Text('ऐप सुरक्षा शुरू नहीं हो सकी'),
             const SizedBox(height: 12),
             SelectableText(_startupError!, textAlign: TextAlign.center),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: _startupError ?? 'App security startup error'));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('त्रुटि संदेश Copy हो गया। अब ChatGPT में Paste करें।')),
+                );
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('त्रुटि संदेश Copy करें'),
+            ),
             const SizedBox(height: 18),
             FilledButton(onPressed: _checkSetup, child: const Text('दोबारा प्रयास करें')),
             const SizedBox(height: 12),
@@ -299,7 +311,18 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
                 const Text('आपका PIN सत्यापित हो चुका है, लेकिन डेटाबेस की जाँच/ओपनिंग में समस्या आई है। अभी नया डेटाबेस न बनाएँ और ऐप का डेटा/फाइलें delete न करें।', style: TextStyle(height: 1.45)),
                 if (_startupError != null) ...[
                   const SizedBox(height: 12),
-                  Text(_startupError!, style: const TextStyle(color: Color(0xFFAC4038), fontSize: 12, height: 1.4)),
+                  SelectableText(_startupError!, style: const TextStyle(color: Color(0xFFAC4038), fontSize: 12, height: 1.4)),
+                  const SizedBox(height: 8),
+                  SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: _startupError ?? 'Database recovery error'));
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('त्रुटि संदेश Copy हो गया। अब ChatGPT में Paste करें।')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: const Text('त्रुटि संदेश Copy करें'),
+                  )),
                 ],
                 const SizedBox(height: 18),
                 SizedBox(width: double.infinity, child: FilledButton.icon(

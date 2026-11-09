@@ -114,9 +114,9 @@ jobs:
                           changed = True
               if not changed:
                   print(f"Could not locate compileSdk declaration in {gradle_file}")
-                  print("\\n".join(line for line in lines if "compileSdk" in line))
+                  print("\n".join(line for line in lines if "compileSdk" in line))
                   raise SystemExit("Unsupported file_picker Gradle syntax")
-              gradle_file.write_text("\\n".join(lines) + "\\n")
+              gradle_file.write_text("\n".join(lines) + "\n")
               print(f"Patched {gradle_file} to compileSdk 36")
           PY
       - name: Add SQLCipher ProGuard keep rules

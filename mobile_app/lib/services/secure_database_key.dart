@@ -24,4 +24,8 @@ class SecureDatabaseKey {
     if (bytes.length != 32) throw const FormatException('Invalid database key');
     await _storage.write(key: _keyName, value: key);
   }
+
+  /// Removes the SQLCipher key when rolling back a restore that began
+  /// without a pre-existing database key.
+  Future<void> clear() => _storage.delete(key: _keyName);
 }

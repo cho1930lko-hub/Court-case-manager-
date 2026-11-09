@@ -442,7 +442,7 @@ class LocalDatabase {
       for (final entry in values.entries) {
         await txn.insert('custom_field_values', {
           'id': '${module}_${recordId}_${entry.key}',
-          'module': module, 'record_id': recordId,
+          'module': customFieldModule ?? module, 'record_id': recordId,
           'field_id': entry.key, 'value': entry.value, 'updated_at': now,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
@@ -698,6 +698,7 @@ class LocalDatabase {
     required String module,
     required String details,
     Map<String, String> customFieldValues = const {},
+    String? customFieldModule,
   }) async {
     const allowed = {'cases', 'dak_register', 'remand_register', 'address_book', 'evidence_items'};
     if (!allowed.contains(table)) throw ArgumentError('Unsupported table: $table');

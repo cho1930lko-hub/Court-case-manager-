@@ -22,7 +22,7 @@ class LocalDatabase {
     _db = await openDatabase(
       path,
       password: key,
-      version: 3,
+      version: 4,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         // journal_mode returns a result row; use rawQuery rather than execute.
@@ -32,6 +32,7 @@ class LocalDatabase {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createGeneratedDocumentsTable(db);
         if (oldVersion < 3) await _createEvidenceTable(db);
+        if (oldVersion < 4) await _createDynamicDataTables(db);
       },
     );
     return _db!;
@@ -226,6 +227,44 @@ class LocalDatabase {
       ('data_owner', 'this_device')
     ''');
     await _createEvidenceTable(db);
+    await _createDynamicDataTables(db);
+  }
+
+  Future<void> _createDynamicDataTables(Database db) async {
+    await db.execute('''CREATE TABLE IF NOT EXISTS field_definitions (
+      id TEXT PRIMARY KEY, module TEXT NOT NULL, field_key TEXT NOT NULL,
+      label TEXT NOT NULL, data_type TEXT NOT NULL DEFAULT 'text',
+      is_required INTEGER NOT NULL DEFAULT 0, is_dropdown INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      UNIQUE(module, field_key)
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS field_options (
+      id TEXT PRIMARY KEY, field_id TEXT NOT NULL, option_label TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(field_id) REFERENCES field_definitions(id) ON DELETE CASCADE
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS field_values (
+      id TEXT PRIMARY KEY, module TEXT NOT NULL, record_id TEXT NOT NULL,
+      field_id TEXT NOT NULL, value TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL, UNIQUE(module, record_id, field_id),
+      FOREIGN KEY(field_id) REFERENCES field_definitions(id)
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS field_permissions (
+      id TEXT PRIMARY KEY, module TEXT NOT NULL, field_id TEXT NOT NULL,
+      role TEXT NOT NULL, can_view INTEGER NOT NULL DEFAULT 1,
+      can_edit INTEGER NOT NULL DEFAULT 0, UNIQUE(module, field_id, role),
+      FOREIGN KEY(field_id) REFERENCES field_definitions(id) ON DELETE CASCADE
+    )''');
+    await db.execute('''CREATE TABLE IF NOT EXISTS import_history (
+      id TEXT PRIMARY KEY, module TEXT NOT NULL, file_name TEXT NOT NULL,
+      total_rows INTEGER NOT NULL DEFAULT 0, imported_rows INTEGER NOT NULL DEFAULT 0,
+      skipped_rows INTEGER NOT NULL DEFAULT 0, error_rows INTEGER NOT NULL DEFAULT 0,
+      imported_at TEXT NOT NULL, details TEXT DEFAULT ''
+    )''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_field_values_record ON field_values(module, record_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_field_definitions_module ON field_definitions(module, is_active)');
   }
 
   Future<void> _createEvidenceTable(Database db) async {

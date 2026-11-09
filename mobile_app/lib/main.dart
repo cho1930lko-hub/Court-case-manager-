@@ -7,6 +7,7 @@ import 'screens/case_activity_screen.dart';
 import 'screens/case_documents_screen.dart';
 import 'screens/audit_log_screen.dart';
 import 'screens/backup_screen.dart';
+import 'screens/change_pin_screen.dart';
 import 'services/app_lock_service.dart';
 
 void main() async {
@@ -262,6 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _ModuleTile(icon: Icons.folder_copy, title: 'Case Document Library', subtitle: 'मुकदमे की फाइलें और पुराने संस्करण', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseDocumentsScreen()))),
               _ModuleTile(icon: Icons.security, title: 'Audit Log', subtitle: 'ऐप में दर्ज बदलावों का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditLogScreen()))),
               _ModuleTile(icon: Icons.backup, title: 'Backup & Restore', subtitle: 'AES-256-GCM encrypted backup और restore', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BackupScreen()))),
+              _ModuleTile(icon: Icons.password, title: 'App PIN बदलें', subtitle: 'वर्तमान PIN से नया PIN सेट करें', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePinScreen()))),
               const SizedBox(height: 12),
               const Text('मुकदमे की कार्यवाही, चेकलिस्ट और दस्तावेज़ अब स्थानीय रूप से दर्ज किए जा सकते हैं.',
                   style: TextStyle(color: Colors.black54)),

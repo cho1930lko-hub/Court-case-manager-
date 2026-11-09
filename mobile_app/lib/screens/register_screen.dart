@@ -327,6 +327,88 @@ class _RegisterFormState extends State<_RegisterForm> {
     setState(() {});
   }
 
+  List<Map<String, Object?>> _formSections() {
+    if (widget.config.table == 'dak_register') {
+      return [
+        {'title': 'डाक का विवरण', 'icon': Icons.mail_outline_rounded, 'fields': ['st_no', 'dak_type', 'status']},
+        {'title': 'संबंधित व्यक्ति एवं थाना', 'icon': Icons.person_pin_circle_outlined, 'fields': ['accused_name', 'person_address', 'related_station']},
+        {'title': 'न्यायालय एवं तारीख', 'icon': Icons.account_balance_outlined, 'fields': ['court_name', 'station_received_date', 'hearing_date']},
+        {'title': 'अतिरिक्त टिप्पणी', 'icon': Icons.notes_rounded, 'fields': ['remarks']},
+      ];
+    }
+    if (widget.config.table == 'remand_register') {
+      return [
+        {'title': 'मुकदमे का विवरण', 'icon': Icons.folder_outlined, 'fields': ['remand_date', 'fir_no', 'sections']},
+        {'title': 'न्यायालय एवं विवेचना', 'icon': Icons.account_balance_outlined, 'fields': ['court_name', 'investigating_officer', 'first_remand_date']},
+        {'title': 'अभियुक्त का विवरण', 'icon': Icons.person_outline, 'fields': ['accused_details']},
+      ];
+    }
+    return [
+      {'title': 'संपर्क विवरण', 'icon': Icons.contact_phone_outlined, 'fields': ['name', 'mobile', 'department']},
+      {'title': 'पता', 'icon': Icons.location_on_outlined, 'fields': ['address']},
+    ];
+  }
+
+  Widget _buildField(RegisterField field) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextFormField(
+      controller: _controllers[field.key],
+      maxLines: field.lines,
+      textInputAction: field.lines > 1 ? TextInputAction.newline : TextInputAction.next,
+      keyboardType: field.key == 'mobile' ? TextInputType.phone : TextInputType.text,
+      readOnly: _isDateField(field.key),
+      onTap: _isDateField(field.key) ? () => _pickDate(field.key) : null,
+      decoration: InputDecoration(
+        labelText: field.required ? '${field.label} *' : field.label,
+        alignLabelWithHint: field.lines > 1,
+        prefixIcon: Icon(_fieldIcon(field.key), size: 19),
+        suffixIcon: _isDateField(field.key) && (_controllers[field.key]?.text.isNotEmpty ?? false)
+            ? IconButton(
+                tooltip: 'दिनांक हटाएँ',
+                onPressed: () => setState(() => _controllers[field.key]!.clear()),
+                icon: const Icon(Icons.close_rounded, size: 18),
+              )
+            : _isDateField(field.key) ? const Icon(Icons.calendar_month_outlined) : null,
+      ),
+      validator: field.required
+          ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null
+          : null,
+    ),
+  );
+
+  Widget _sectionCard(Map<String, Object?> section) {
+    final keys = section['fields'] as List<String>;
+    final fields = widget.config.fields.where((field) => keys.contains(field.key));
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(15, 15, 15, 3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppTheme.blue.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(section['icon'] as IconData, color: AppTheme.blue, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                section['title'] as String,
+                style: Theme.of(context).textTheme.titleMedium,
+              )),
+            ]),
+            const SizedBox(height: 15),
+            for (final field in fields) _buildField(field),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
@@ -354,42 +436,10 @@ class _RegisterFormState extends State<_RegisterForm> {
                       const SizedBox(height: 4),
                       Text(widget.config.title, style: const TextStyle(color: AppTheme.muted, fontSize: 13)),
                       const SizedBox(height: 18),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(15),
-                          child: Column(
-                            children: [
-                              for (final field in widget.config.fields)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: TextFormField(
-                                    controller: _controllers[field.key],
-                                    maxLines: field.lines,
-                                    textInputAction: field.lines > 1 ? TextInputAction.newline : TextInputAction.next,
-                                    keyboardType: field.key == 'mobile' ? TextInputType.phone : TextInputType.text,
-                                    readOnly: _isDateField(field.key),
-                                    onTap: _isDateField(field.key) ? () => _pickDate(field.key) : null,
-                                    decoration: InputDecoration(
-                                      labelText: field.required ? '${field.label} *' : field.label,
-                                      alignLabelWithHint: field.lines > 1,
-                                      prefixIcon: Icon(_fieldIcon(field.key), size: 19),
-                                      suffixIcon: _isDateField(field.key) && (_controllers[field.key]?.text.isNotEmpty ?? false)
-                                          ? IconButton(
-                                              tooltip: 'दिनांक हटाएँ',
-                                              onPressed: () => setState(() => _controllers[field.key]!.clear()),
-                                              icon: const Icon(Icons.close_rounded, size: 18),
-                                            )
-                                          : _isDateField(field.key) ? const Icon(Icons.calendar_month_outlined) : null,
-                                    ),
-                                    validator: field.required
-                                        ? (v) => v == null || v.trim().isEmpty ? 'यह विवरण आवश्यक है' : null
-                                        : null,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      for (final section in _formSections()) ...[
+                        _sectionCard(section),
+                        const SizedBox(height: 12),
+                      ],
                       const SizedBox(height: 14),
                       Row(
                         children: [

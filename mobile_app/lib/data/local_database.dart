@@ -228,6 +228,7 @@ class LocalDatabase {
       ('data_owner', 'this_device')
     ''');
     await _createEvidenceTable(db);
+    await _createDynamicFieldTables(db);
     await _createDynamicDataTables(db);
   }
 

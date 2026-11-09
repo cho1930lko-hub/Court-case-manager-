@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local_database.dart';
@@ -240,7 +239,7 @@ class _CaseFormState extends State<_CaseForm> {
               _field('तलब साक्षी', witnesses),
               _field('अगली तारीख पेशी (DD/MM/YYYY)', nextHearing),
               DropdownButtonFormField<String>(
-                value: status,
+                initialValue: status,
                 decoration: const InputDecoration(labelText: 'मुकदमे की स्थिति', border: OutlineInputBorder()),
                 items: const ['साक्ष्य','हाजिरी','बहस','313 सीआरपीसी','सफाई साक्ष्य','जजमेंट','सजा','दोष मुक्त','अभियुक्त NBW']
                     .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),

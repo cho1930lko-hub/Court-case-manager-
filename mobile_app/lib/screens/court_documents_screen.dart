@@ -132,6 +132,60 @@ class _CourtDocumentsScreenState extends State<CourtDocumentsScreen> {
     }
   }
 
+  Future<void> _copyDraft() async {
+    if (_preview.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: _preview));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ड्राफ्ट कॉपी हो गया।')),
+    );
+  }
+
+  Future<void> _showFullPreview() async {
+    if (_preview.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 680,
+            maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.86,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  const Expanded(child: Text('ड्राफ्ट का पूरा प्रीव्यू', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
+                  IconButton(tooltip: 'बंद करें', onPressed: () => Navigator.of(dialogContext).pop(), icon: const Icon(Icons.close_rounded)),
+                ]),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Expanded(child: SingleChildScrollView(child: SelectableText(
+                  _preview,
+                  style: const TextStyle(height: 1.75, fontSize: 14, color: AppTheme.ink),
+                ))),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: _preview));
+                    if (!dialogContext.mounted) return;
+                    Navigator.of(dialogContext).pop();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ड्राफ्ट कॉपी हो गया।')));
+                  },
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('पूरा ड्राफ्ट कॉपी करें'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   Widget _sectionTitle(String title, String subtitle, IconData icon) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,18 +390,17 @@ class _CourtDocumentsScreenState extends State<CourtDocumentsScreen> {
                     ),
                     if (_preview.isNotEmpty) ...[
                       const SizedBox(height: 20),
-                      Row(
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          Expanded(child: Text('ड्राफ्ट प्रीव्यू', style: Theme.of(context).textTheme.titleLarge)),
-                          TextButton.icon(
-                            onPressed: () async {
-                              await Clipboard.setData(ClipboardData(text: _preview));
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ड्राफ्ट कॉपी हो गया।')));
-                            },
-                            icon: const Icon(Icons.copy_rounded, size: 18),
-                            label: const Text('कॉपी करें'),
-                          ),
+                          Text('ड्राफ्ट प्रीव्यू', style: Theme.of(context).textTheme.titleLarge),
+                          Wrap(spacing: 4, children: [
+                            TextButton.icon(onPressed: _showFullPreview, icon: const Icon(Icons.open_in_full_rounded, size: 18), label: const Text('पूरा देखें')),
+                            TextButton.icon(onPressed: _copyDraft, icon: const Icon(Icons.copy_rounded, size: 18), label: const Text('कॉपी करें')),
+                          ]),
                         ],
                       ),
                       Card(

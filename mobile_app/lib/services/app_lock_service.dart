@@ -83,7 +83,12 @@ class AppLockService {
   }
 
   void _validatePin(String pin) {
-    if (!RegExp(r'^\\d{6,8}$').hasMatch(pin)) {
+    if (!RegExp(r'^\d{6,8}).hasMatch(pin)) {
+      throw ArgumentError('PIN 6 से 8 अंकों का होना चाहिए।');
+    }
+  }
+}
+).hasMatch(pin)) {
       throw ArgumentError('PIN 6 से 8 अंकों का होना चाहिए।');
     }
   }

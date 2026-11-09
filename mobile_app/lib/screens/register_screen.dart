@@ -106,12 +106,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       builder: (_) => _RegisterForm(config: widget.config, initial: row));
     if (result == null) return;
     final id = (row?['id'] ?? const Uuid().v4()).toString();
+    final values = <String, Object?>{};
+    final customValues = <String, String>{};
+    for (final entry in result.entries) {
+      if (entry.key.startsWith('__custom__:')) {
+        customValues[entry.key.substring(11)] = entry.value.toString();
+      } else {
+        values[entry.key] = entry.value;
+      }
+    }
     try {
       await LocalDatabase.instance.saveWithAudit(
-        table: widget.config.table, values: result, recordId: id, isNew: row == null,
+        table: widget.config.table, values: values, recordId: id, isNew: row == null,
+        customFieldValues: customValues,
         action: row == null ? 'REGISTER_CREATED' : 'REGISTER_UPDATED',
         module: widget.config.table,
-        details: widget.config.title + ': ' + (result[widget.config.titleField] ?? '').toString(),
+        details: widget.config.title + ': ' + (values[widget.config.titleField] ?? '').toString(),
       );
       await _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -258,6 +268,10 @@ class _RegisterForm extends StatefulWidget {
 class _RegisterFormState extends State<_RegisterForm> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+  List<Map<String, Object?>> _customFields = [];
+  final Map<String, TextEditingController> _customControllers = {};
+  final Map<String, String> _customDropdowns = {};
+  final Map<String, List<Map<String, Object?>>> _customOptions = {};
 
   @override
   void initState() {
@@ -265,10 +279,29 @@ class _RegisterFormState extends State<_RegisterForm> {
     for (final field in widget.config.fields) {
       _controllers[field.key] = TextEditingController(text: (widget.initial?[field.key] ?? '').toString());
     }
+    _loadCustomFields();
+  }
+
+  Future<void> _loadCustomFields() async {
+    final module = widget.config.table;
+    final fields = await LocalDatabase.instance.getFieldDefinitions(module);
+    final values = widget.initial == null ? <String, String>{} :
+      await LocalDatabase.instance.getCustomFieldValues(module, widget.initial!['id'].toString());
+    for (final field in fields) {
+      final id = field['id'].toString();
+      final type = field['data_type'].toString();
+      if (type == 'dropdown') {
+        _customOptions[id] = await LocalDatabase.instance.getFieldOptions(id);
+        _customDropdowns[id] = values[id] ?? '';
+      } else {
+        _customControllers[id] = TextEditingController(text: values[id] ?? '');
+      }
+    }
+    if (mounted) setState(() => _customFields = fields);
   }
 
   @override
-  void dispose() { for (final c in _controllers.values) { c.dispose(); } super.dispose(); }
+  void dispose() { for (final c in _controllers.values) { c.dispose(); } for (final c in _customControllers.values) { c.dispose(); } super.dispose(); }
 
   IconData _fieldIcon(String key) {
     switch (key) {
@@ -386,6 +419,50 @@ class _RegisterFormState extends State<_RegisterForm> {
     ),
   );
 
+  Widget _customFieldsCard() {
+    if (_customFields.isEmpty) return const SizedBox.shrink();
+    return Card(child: Padding(
+      padding: const EdgeInsets.fromLTRB(15, 15, 15, 3),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.tune_rounded, color: AppTheme.blue, size: 19),
+          const SizedBox(width: 8),
+          Text('अतिरिक्त / Custom Fields', style: Theme.of(context).textTheme.titleMedium),
+        ]),
+        const SizedBox(height: 14),
+        for (final field in _customFields) ...[
+          Builder(builder: (context) {
+            final id = field['id'].toString();
+            final label = field['label'].toString();
+            final type = field['data_type'].toString();
+            final requiredField = field['is_required'] == 1;
+            if (type == 'dropdown') {
+              final options = _customOptions[id] ?? [];
+              final current = _customDropdowns[id];
+              return Padding(padding: const EdgeInsets.only(bottom: 12),
+                child: DropdownButtonFormField<String>(
+                  value: current != null && current.isNotEmpty && options.any((o) => o['option_label'] == current) ? current : null,
+                  decoration: InputDecoration(labelText: requiredField ? '$label *' : label),
+                  items: options.map((o) => DropdownMenuItem(value: o['option_label'].toString(), child: Text(o['option_label'].toString()))).toList(),
+                  onChanged: (v) => setState(() => _customDropdowns[id] = v ?? ''),
+                  validator: requiredField ? (v) => (v == null || v.isEmpty) ? 'यह विवरण आवश्यक है' : null : null,
+                ));
+            }
+            final controller = _customControllers[id]!;
+            return Padding(padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(
+                controller: controller,
+                maxLines: type == 'multiline' ? 3 : 1,
+                keyboardType: type == 'number' ? TextInputType.number : TextInputType.text,
+                decoration: InputDecoration(labelText: requiredField ? '$label *' : label),
+                validator: requiredField ? (v) => (v == null || v.trim().isEmpty) ? 'यह विवरण आवश्यक है' : null : null,
+              ));
+          }),
+        ],
+      ]),
+    ));
+  }
+
   Widget _sectionCard(Map<String, Object?> section) {
     final keys = section['fields'] as List<String>;
     final fields = widget.config.fields.where((field) => keys.contains(field.key));
@@ -450,6 +527,8 @@ class _RegisterFormState extends State<_RegisterForm> {
                         _sectionCard(section),
                         const SizedBox(height: 12),
                       ],
+                      _customFieldsCard(),
+                      if (_customFields.isNotEmpty) const SizedBox(height: 12),
                       const SizedBox(height: 14),
                       Row(
                         children: [
@@ -467,6 +546,8 @@ class _RegisterFormState extends State<_RegisterForm> {
                                 if (!_formKey.currentState!.validate()) return;
                                 Navigator.pop(context, {
                                   for (final e in _controllers.entries) e.key: e.value.text.trim(),
+                                  for (final e in _customControllers.entries) '__custom__:${e.key}': e.value.text.trim(),
+                                  for (final e in _customDropdowns.entries) '__custom__:${e.key}': e.value,
                                 });
                               },
                               icon: const Icon(Icons.save_rounded),

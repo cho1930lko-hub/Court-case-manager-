@@ -82,7 +82,7 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
         ? const Center(child: Text('पहले Session Court में मुकदमा जोड़ें।'))
         : Column(children: [
           Padding(padding: const EdgeInsets.all(12), child: DropdownButtonFormField<String>(
-            value: _caseId, isExpanded: true,
+            initialValue: _caseId, isExpanded: true,
             decoration: const InputDecoration(labelText: 'मुकदमा चुनें', border: OutlineInputBorder()),
             items: _cases.map((c) => DropdownMenuItem(value: c['id'].toString(), child: Text('ST ${c['st_no']} • ${c['accused_name']}', overflow: TextOverflow.ellipsis))).toList(),
             onChanged: _selectCase,

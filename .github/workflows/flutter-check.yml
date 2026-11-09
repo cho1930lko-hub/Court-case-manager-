@@ -37,23 +37,59 @@ jobs:
       - run: flutter test
       - name: Generate Android platform project
         run: flutter create --platforms=android --org in.gov.courtcases --project-name court_case_manager .
-      - name: Set Android compile SDK 36
+      - name: Set Android compile SDK 36 for app and plugin modules
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
-          for path in candidates:
-              if not path.exists():
-                  continue
-              source = path.read_text()
-              updated = source.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36")
-              updated = updated.replace("compileSdkVersion flutter.compileSdkVersion", "compileSdkVersion 36")
-              if updated != source:
-                  path.write_text(updated)
-                  print(f"Updated {path} to compileSdk 36")
-                  break
-          else:
-              raise SystemExit("Could not find the generated Android compileSdk declaration")
+
+          app_candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          app = next((p for p in app_candidates if p.exists()), None)
+          if app is None:
+              raise SystemExit("Generated Android app Gradle file not found")
+          source = app.read_text()
+          updated = source.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36")
+          updated = updated.replace("compileSdkVersion flutter.compileSdkVersion", "compileSdkVersion 36")
+          if updated == source and "compileSdk = 36" not in source and "compileSdkVersion 36" not in source:
+              raise SystemExit(f"Could not update compileSdk in {app}")
+          app.write_text(updated)
+          print(f"Set {app} compileSdk to 36")
+
+          root_candidates = [Path("android/build.gradle.kts"), Path("android/build.gradle")]
+          root = next((p for p in root_candidates if p.exists()), None)
+          if root is None:
+              raise SystemExit("Generated root Gradle file not found")
+          root_source = root.read_text()
+          if "FORCE_ANDROID_PLUGIN_COMPILE_SDK_36" not in root_source:
+              if root.suffix == ".kts":
+                  root_source += """
+          // FORCE_ANDROID_PLUGIN_COMPILE_SDK_36
+          subprojects {
+              plugins.withId("com.android.library") {
+                  extensions.configure<com.android.build.gradle.LibraryExtension> {
+                      compileSdk = 36
+                  }
+              }
+              plugins.withId("com.android.application") {
+                  extensions.configure<com.android.build.gradle.AppExtension> {
+                      compileSdkVersion(36)
+                  }
+              }
+          }
+          """
+              else:
+                  root_source += """
+          // FORCE_ANDROID_PLUGIN_COMPILE_SDK_36
+          subprojects {
+              plugins.withId('com.android.library') {
+                  extensions.getByName('android').compileSdkVersion(36)
+              }
+              plugins.withId('com.android.application') {
+                  extensions.getByName('android').compileSdkVersion(36)
+              }
+          }
+          """
+              root.write_text(root_source)
+          print(f"Configured Android subprojects in {root}")
           PY
       - name: Add SQLCipher ProGuard keep rules
         run: |

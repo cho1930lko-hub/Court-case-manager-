@@ -279,6 +279,56 @@ class LocalDatabase {
     }, conflictAlgorithm: ConflictAlgorithm.abort);
   }
 
+  Future<List<Map<String, Object?>>> caseTimeline(String caseId) async {
+    final db = await database;
+    return db.query('case_timeline', where: 'case_id = ?', whereArgs: [caseId],
+      orderBy: 'event_date DESC, created_at DESC');
+  }
+
+  Future<void> addTimelineEvent({
+    required String id, required String caseId, required String date,
+    required String type, required String description,
+  }) async {
+    final db = await database;
+    await db.insert('case_timeline', {
+      'id': id, 'case_id': caseId, 'event_date': date,
+      'event_type': type, 'description': description,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<List<Map<String, Object?>>> caseChecklist(String caseId) async {
+    final db = await database;
+    return db.query('case_checklist', where: 'case_id = ?', whereArgs: [caseId],
+      orderBy: "CASE WHEN status = 'पूर्ण' THEN 1 ELSE 0 END, due_date ASC");
+  }
+
+  Future<void> addChecklistTask({
+    required String id, required String caseId, required String task,
+    required String dueDate, required String assignedTo, required String remarks,
+  }) async {
+    final db = await database;
+    await db.insert('case_checklist', {
+      'id': id, 'case_id': caseId, 'task_name': task,
+      'status': 'लंबित', 'due_date': dueDate, 'assigned_to': assignedTo,
+      'remarks': remarks, 'updated_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> setChecklistStatus(String id, bool done) async {
+    final db = await database;
+    await db.update('case_checklist', {
+      'status': done ? 'पूर्ण' : 'लंबित',
+      'completed_date': done ? DateTime.now().toIso8601String() : '',
+      'updated_at': DateTime.now().toIso8601String(),
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, Object?>>> auditEntries({int limit = 300}) async {
+    final db = await database;
+    return db.query('audit_log', orderBy: 'created_at DESC', limit: limit);
+  }
+
   Future<String> databasePath() async {
     final root = await getDatabasesPath();
     return p.join(root, 'court_case_manager.db');

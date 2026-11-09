@@ -4,6 +4,20 @@ import 'package:court_case_manager/services/secure_backup_service.dart';
 import 'package:court_case_manager/services/backup_path_validator.dart';
 
 void main() {
+  group('PIN format (shared by setup, unlock and change-PIN)', () {
+    test('accepts 6 to 8 ASCII digits', () {
+      for (final pin in ['123456', '1234567', '12345678']) {
+        expect(AppLockService.isValidPinFormat(pin), isTrue, reason: pin);
+      }
+    });
+
+    test('rejects wrong length, letters, spaces, backslash and non-ASCII digits', () {
+      for (final pin in ['', '12345', '123456789', '12ab56', '123 456', r'\\d123456', '१२३४५६', '123456\\n']) {
+        expect(AppLockService.isValidPinFormat(pin), isFalse, reason: pin);
+      }
+    });
+  });
+
   group('AppLockService PIN validation', () {
     test('rejects PIN shorter than six digits', () async {
       await expectLater(

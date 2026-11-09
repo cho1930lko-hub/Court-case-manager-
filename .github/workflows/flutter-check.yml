@@ -30,6 +30,24 @@ jobs:
       - run: flutter test
       - name: Generate Android platform project
         run: flutter create --platforms=android --org in.gov.courtcases --project-name court_case_manager .
+      - name: Set Android compile SDK 36
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          for path in candidates:
+              if not path.exists():
+                  continue
+              source = path.read_text()
+              updated = source.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36")
+              updated = updated.replace("compileSdkVersion flutter.compileSdkVersion", "compileSdkVersion 36")
+              if updated != source:
+                  path.write_text(updated)
+                  print(f"Updated {path} to compileSdk 36")
+                  break
+          else:
+              raise SystemExit("Could not find the generated Android compileSdk declaration")
+          PY
       - name: Add SQLCipher ProGuard keep rules
         run: |
           mkdir -p android/app

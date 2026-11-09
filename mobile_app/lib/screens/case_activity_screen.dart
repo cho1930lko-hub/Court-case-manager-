@@ -177,13 +177,21 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
                 child: Card(child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Expanded(child: Text(e['event_type'].toString(),
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink))),
-                      Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                        decoration: BoxDecoration(color: const Color(0xFFEAF0FA), borderRadius: BorderRadius.circular(20)),
-                        child: Text(e['event_date'].toString(), style: const TextStyle(fontSize: 10, color: AppTheme.blue, fontWeight: FontWeight.w700))),
-                    ]),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(e['event_type'].toString(),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.ink)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                          decoration: BoxDecoration(color: const Color(0xFFEAF0FA), borderRadius: BorderRadius.circular(20)),
+                          child: Text(e['event_date'].toString(),
+                            style: const TextStyle(fontSize: 10, color: AppTheme.blue, fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     Text(e['description'].toString(), style: const TextStyle(fontSize: 13, color: AppTheme.muted, height: 1.45)),
                   ]),
@@ -259,18 +267,25 @@ class _TaskCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 8, 14, 12),
         child: Column(children: [
-          Row(children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Checkbox(value: done, onChanged: (v) => onChanged(v ?? false)),
-            Expanded(child: Text(task['task_name'].toString(),
-              style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.ink,
-                decoration: done ? TextDecoration.lineThrough : null,
-                decorationColor: AppTheme.muted))),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-              decoration: BoxDecoration(
-                color: (done ? AppTheme.teal : const Color(0xFFC47B28)).withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(20)),
-              child: Text(done ? 'पूर्ण' : 'लंबित', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800,
-                color: done ? AppTheme.teal : const Color(0xFFC47B28)))),
+            Expanded(child: Padding(
+              padding: const EdgeInsets.only(top: 11),
+              child: Text(task['task_name'].toString(),
+                style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.ink,
+                  decoration: done ? TextDecoration.lineThrough : null,
+                  decorationColor: AppTheme.muted)),
+            )),
+            const SizedBox(width: 6),
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: (done ? AppTheme.teal : const Color(0xFFC47B28)).withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(20)),
+                child: Text(done ? 'पूर्ण' : 'लंबित', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800,
+                  color: done ? AppTheme.teal : const Color(0xFFC47B28)))),
+            ),
           ]),
           if (due.isNotEmpty || assigned.isNotEmpty || remarks.isNotEmpty)
             Padding(padding: const EdgeInsets.only(left: 42, top: 2),
@@ -346,13 +361,17 @@ class _EntryDialogState extends State<_EntryDialog> {
   Widget build(BuildContext context) => AlertDialog(
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     title: Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
-    content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+    content: SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .55),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
       for (var i = 0; i < widget.fields.length; i++)
         Padding(padding: const EdgeInsets.only(bottom: 11), child: TextField(
           controller: controllers[i], maxLines: i == widget.fields.length - 1 ? 3 : 1,
           decoration: InputDecoration(labelText: widget.fields[i]),
         )),
     ])),
+    ),
     actions: [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('रद्द')),
       FilledButton(onPressed: () {

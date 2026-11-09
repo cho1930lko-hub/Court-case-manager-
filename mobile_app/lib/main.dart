@@ -125,7 +125,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
     return Stack(
       fit: StackFit.expand,
       children: [
-        child,
+        widget.child,
         if (!_unlocked)
           Scaffold(
             backgroundColor: const Color(0xFFF4F6FB),

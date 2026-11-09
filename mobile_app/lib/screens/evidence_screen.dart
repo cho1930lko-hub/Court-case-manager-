@@ -155,7 +155,7 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                       child: DropdownButtonFormField<String>(
-                        value: _caseId,
+                        initialValue: _caseId,
                         isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'मुकदमा चुनें',
@@ -361,7 +361,7 @@ class _EvidenceFormState extends State<_EvidenceForm> {
                   style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                value: _caseId,
+                initialValue: _caseId,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'संबंधित मुकदमा'),
                 items: widget.cases.map((c) => DropdownMenuItem(
@@ -372,7 +372,7 @@ class _EvidenceFormState extends State<_EvidenceForm> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: _type,
+                initialValue: _type,
                 decoration: const InputDecoration(labelText: 'साक्ष्य का प्रकार'),
                 items: const ['बरामदगी', 'भौतिक साक्ष्य', 'दस्तावेज', 'इलेक्ट्रॉनिक साक्ष्य', 'अन्य']
                     .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),

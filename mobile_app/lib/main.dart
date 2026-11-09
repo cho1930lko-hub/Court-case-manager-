@@ -103,6 +103,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _selectedTab = 0;
   late Future<Map<String, int>> _counts;
 
   @override
@@ -136,7 +137,26 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: FutureBuilder<Map<String, int>>(
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) {
+          setState(() => _selectedTab = index);
+          if (index == 0) _refresh();
+        },
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'होम'),
+          NavigationDestination(icon: Icon(Icons.gavel_outlined), selectedIcon: Icon(Icons.gavel_rounded), label: 'मुकदमे'),
+          NavigationDestination(icon: Icon(Icons.search_rounded), label: 'खोज'),
+          NavigationDestination(icon: Icon(Icons.apps_rounded), label: 'अन्य'),
+        ],
+      ),
+      body: _selectedTab == 1
+          ? const CasesScreen()
+          : _selectedTab == 2
+              ? const GlobalSearchScreen()
+              : _selectedTab == 3
+                  ? _buildMoreMenu()
+                  : FutureBuilder<Map<String, int>>(
         future: _counts,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -224,35 +244,53 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 const SizedBox(height: 25),
-                _sectionHeading('मुख्य कार्य', 'रजिस्टर और सुविधाएँ'),
+                _sectionHeading('त्वरित कार्य', 'अक्सर उपयोग होने वाले मॉड्यूल'),
                 const SizedBox(height: 12),
-                _ModuleTile(
-                  icon: Icons.search_rounded,
-                  title: 'सभी रिकॉर्ड में खोज',
-                  subtitle: 'मुकदमे, डाक, रिमांड, संपर्क और दस्तावेज एक साथ खोजें',
-                  color: AppTheme.teal,
-                  onTap: () => _open(const GlobalSearchScreen()),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth >= 560 ? 4 : 2;
+                    return GridView.count(
+                      crossAxisCount: columns,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: columns == 4 ? 1.18 : 1.42,
+                      children: [
+                        _QuickAction(icon: Icons.account_balance_rounded, title: 'सेशन कोर्ट', color: AppTheme.blue, onTap: () => setState(() => _selectedTab = 1)),
+                        _QuickAction(icon: Icons.mark_email_unread_rounded, title: 'डाक दर्ज करें', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: dakConfig))),
+                        _QuickAction(icon: Icons.assignment_rounded, title: 'रिमांड', color: AppTheme.blue, onTap: () => _open(const RegisterScreen(config: remandConfig))),
+                        _QuickAction(icon: Icons.description_rounded, title: 'दस्तावेज बनाएँ', color: AppTheme.teal, onTap: () => _open(const CourtDocumentsScreen())),
+                      ],
+                    );
+                  },
                 ),
-                _ModuleTile(icon: Icons.account_balance_rounded, title: 'सेशन कोर्ट', subtitle: 'मुकदमे, पेशी, गवाह और स्थिति', color: AppTheme.blue, onTap: () => _open(const CasesScreen())),
-                _ModuleTile(icon: Icons.mark_email_unread_rounded, title: 'डाक रजिस्टर', subtitle: 'डाक प्रविष्टि, स्थिति और खोज', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: dakConfig))),
-                _ModuleTile(icon: Icons.assignment_rounded, title: 'रिमांड रजिस्टर', subtitle: 'रिमांड संबंधी विवरण', color: AppTheme.blue, onTap: () => _open(const RegisterScreen(config: remandConfig))),
-                _ModuleTile(icon: Icons.contact_phone_rounded, title: 'Address Book', subtitle: 'अधिकारी, गवाह और विभागीय संपर्क', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: addressConfig))),
-                _ModuleTile(icon: Icons.description_rounded, title: 'समन एवं कार्यवाही आख्या', subtitle: 'मुकदमे के आधार पर प्रारूप तैयार करें', color: AppTheme.blue, onTap: () => _open(const CourtDocumentsScreen())),
-                _ModuleTile(icon: Icons.timeline_rounded, title: 'Timeline एवं Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित काम', color: AppTheme.teal, onTap: () => _open(const CaseActivityScreen())),
-                _ModuleTile(icon: Icons.event_available_rounded, title: 'अगली पेशी की तैयारी', subtitle: 'आगामी पेशी, लंबित कार्य और तैयारी का सारांश', color: AppTheme.blue, onTap: () => _open(const CasePreparationScreen())),
-                _ModuleTile(icon: Icons.folder_copy_rounded, title: 'दस्तावेज लाइब्रेरी', subtitle: 'केस फाइलें और पुराने संस्करण', color: AppTheme.teal, onTap: () => _open(const CaseDocumentsScreen())),
-                _ModuleTile(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Evidence एवं Exhibit Manager',
-                  subtitle: 'बरामदगी, मालखाना, सील, Exhibit और संलग्न फाइलें',
-                  color: AppTheme.teal,
-                  onTap: () => _open(const EvidenceScreen()),
+                const SizedBox(height: 20),
+                Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => setState(() => _selectedTab = 3),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE5EAF1)),
+                      ),
+                      child: const Row(children: [
+                        Icon(Icons.apps_rounded, color: AppTheme.blue, size: 22),
+                        SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('सभी मॉड्यूल देखें', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF172B4D))),
+                          SizedBox(height: 3),
+                          Text('Address Book, Timeline, Evidence, Backup और अन्य', style: TextStyle(fontSize: 11, color: Color(0xFF68778D))),
+                        ])),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF9AA6B6)),
+                      ]),
+                    ),
+                  ),
                 ),
-                _ModuleTile(icon: Icons.security_rounded, title: 'Audit Log', subtitle: 'ऐप में दर्ज गतिविधियों का रिकॉर्ड', color: AppTheme.blue, onTap: () => _open(const AuditLogScreen())),
-                const SizedBox(height: 18),
-                _sectionHeading('सुरक्षा एवं बैकअप', 'डिवाइस प्रबंधन'),
-                const SizedBox(height: 12),
-                _UtilityTile(icon: Icons.enhanced_encryption_rounded, title: 'Backup & Restore', onTap: () => _open(const BackupScreen())),
                 const SizedBox(height: 18),
                 const Center(child: Text('पैरवी रजिस्टर  •  Offline Case Manager',
                   style: TextStyle(color: Color(0xFF8995A7), fontSize: 11, fontWeight: FontWeight.w600))),
@@ -261,6 +299,28 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildMoreMenu() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+      children: [
+        Text('सभी मॉड्यूल', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 4),
+        Text('रजिस्टर, दस्तावेज और डिवाइस सुविधाएँ', style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 18),
+        _ModuleTile(icon: Icons.contact_phone_rounded, title: 'Address Book', subtitle: 'अधिकारी, गवाह और विभागीय संपर्क', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: addressConfig))),
+        _ModuleTile(icon: Icons.timeline_rounded, title: 'Timeline एवं Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित काम', color: AppTheme.teal, onTap: () => _open(const CaseActivityScreen())),
+        _ModuleTile(icon: Icons.event_available_rounded, title: 'अगली पेशी की तैयारी', subtitle: 'आगामी पेशी और तैयारी का सारांश', color: AppTheme.blue, onTap: () => _open(const CasePreparationScreen())),
+        _ModuleTile(icon: Icons.folder_copy_rounded, title: 'दस्तावेज लाइब्रेरी', subtitle: 'केस फाइलें और पुराने संस्करण', color: AppTheme.teal, onTap: () => _open(const CaseDocumentsScreen())),
+        _ModuleTile(icon: Icons.inventory_2_outlined, title: 'Evidence एवं Exhibit Manager', subtitle: 'बरामदगी, मालखाना, सील, Exhibit और संलग्न फाइलें', color: AppTheme.teal, onTap: () => _open(const EvidenceScreen())),
+        _ModuleTile(icon: Icons.security_rounded, title: 'Audit Log', subtitle: 'ऐप में दर्ज गतिविधियों का रिकॉर्ड', color: AppTheme.blue, onTap: () => _open(const AuditLogScreen())),
+        const SizedBox(height: 16),
+        Text('सुरक्षा एवं बैकअप', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 10),
+        _ModuleTile(icon: Icons.enhanced_encryption_rounded, title: 'Backup & Restore', subtitle: 'डेटाबेस का सुरक्षित बैकअप और रीस्टोर', color: AppTheme.blue, onTap: () => _open(const BackupScreen())),
+      ],
     );
   }
 
@@ -273,6 +333,44 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
       ])),
     ],
+  );
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({required this.icon, required this.title, required this.color, required this.onTap});
+  final IconData icon;
+  final String title;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5EAF1)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(13)),
+              child: Icon(icon, color: color, size: 21),
+            ),
+            const SizedBox(height: 9),
+            Text(title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF172B4D))),
+          ],
+        ),
+      ),
+    ),
   );
 }
 

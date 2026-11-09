@@ -15,12 +15,15 @@ class LocalDatabase {
     final path = p.join(root, 'court_case_manager.db');
     _db = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.execute('PRAGMA journal_mode = WAL');
       },
       onCreate: _createSchema,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createGeneratedDocumentsTable(db);
+      },
     );
     return _db!;
   }
@@ -120,13 +123,7 @@ class LocalDatabase {
         created_at TEXT NOT NULL, FOREIGN KEY(case_id) REFERENCES cases(id)
       )
     ''');
-    await db.execute('''
-      CREATE TABLE generated_documents (
-        id TEXT PRIMARY KEY, case_id TEXT NOT NULL, document_type TEXT NOT NULL,
-        content TEXT NOT NULL, created_at TEXT NOT NULL,
-        FOREIGN KEY(case_id) REFERENCES cases(id)
-      )
-    ''');
+    await _createGeneratedDocumentsTable(db);
     await db.execute('''
       CREATE TABLE document_versions (
         id TEXT PRIMARY KEY, document_group_id TEXT NOT NULL,
@@ -150,6 +147,16 @@ class LocalDatabase {
       INSERT INTO app_settings(key, value) VALUES
       ('schema_label', 'offline_v1'),
       ('data_owner', 'this_device')
+    ''');
+  }
+
+  Future<void> _createGeneratedDocumentsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE generated_documents (
+        id TEXT PRIMARY KEY, case_id TEXT NOT NULL, document_type TEXT NOT NULL,
+        content TEXT NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY(case_id) REFERENCES cases(id)
+      )
     ''');
   }
 

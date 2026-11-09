@@ -35,6 +35,14 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Document Version History: adding a revised file records a version entry and updates the current document pointer.
 - Audit Log viewer: recent recorded app actions can be reviewed in read-only form.
 
+## Phase 4 progress
+
+- Mandatory 6–8 digit app PIN setup; PIN hash is derived with PBKDF2-HMAC-SHA256 and stored using Android secure storage.
+- App returns to the lock screen when the app becomes inactive/backgrounded.
+- Password-protected backup format uses PBKDF2-HMAC-SHA256 (310,000 iterations) and AES-256-GCM authenticated encryption.
+- Backup includes the SQLite database and app-managed case document files.
+- Restore checks the backup format, authenticates/decrypts it, validates the SQLite header and `PRAGMA integrity_check` in a temporary database before replacing current data.
+
 ## Still pending
 
 - Full field-by-field parity with the existing Streamlit registers.
@@ -45,7 +53,9 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Android platform project generation and release APK build.
 - Officially formatted PDF/print output (Hindi font embedding is required before reliable PDF generation).
 - Dak attachments/photos, Excel import/export, and backup/restore.
-- Database encryption, app lock, backup encryption, restore validation, and device-loss recovery.
+- Live SQLite database encryption at rest (current database file remains unencrypted).
+- PIN attempt throttling, recovery flow, security review, and full restore rollback testing.
+- Backup compatibility tests across app/schema versions and verification of document file completeness.
 - Legacy data import and row-count reconciliation.
 
 ## Build
@@ -63,7 +73,7 @@ The release APK is generated at `build/app/outputs/flutter-apk/app-release.apk` 
 
 ## Data safety
 
-The database is currently an initial SQLite implementation and is not encrypted. Before real police/court records are entered, database encryption, app lock, backup encryption, restore validation, and device-loss recovery must be implemented and tested. Do not use this build for production records yet.
+The live SQLite database is still not encrypted at rest. The app PIN and encrypted backup are initial implementations and have not yet passed Android-device security testing. Restore replaces current local data after a confirmation; make a separate backup first. Do not use this build for real police/court records until database encryption, lockout/recovery, backup/restore and attachment integrity have been independently tested.
 
 ## Migration policy
 

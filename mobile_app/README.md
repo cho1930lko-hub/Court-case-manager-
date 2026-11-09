@@ -41,7 +41,7 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - App returns to the lock screen when the app becomes inactive/backgrounded.
 - Password-protected backup format uses PBKDF2-HMAC-SHA256 (310,000 iterations) and AES-256-GCM authenticated encryption.
 - Backup includes the SQLite database and app-managed case document files.
-- Restore checks the backup format, authenticates/decrypts it, validates the SQLite header and `PRAGMA integrity_check` in a temporary database before replacing current data.
+- Restore checks the backup format, authenticates/decrypts it, validates the encrypted SQLCipher database and `PRAGMA integrity_check` in a temporary database before replacing current data.
 
 ## Phase 4 security implementation
 
@@ -61,7 +61,7 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Automated tests and actual Android-device testing.
 - Android platform project generation and release APK build.
 - Officially formatted PDF/print output (Hindi font embedding is required before reliable PDF generation).
-- Dak attachments/photos, Excel import/export, and backup/restore.
+- Dak attachments/photos and Excel import/export.
 - Android-device verification of SQLCipher migration, key storage, lockout behavior, backup portability and restore rollback.
 - PIN recovery is intentionally not bypassable: use a verified encrypted backup on a clean installation/device and set a new local PIN. The backup password and backup file must both be available.
 - Backup compatibility tests across future app/schema versions and file completeness checks.

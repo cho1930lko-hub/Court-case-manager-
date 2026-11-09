@@ -219,10 +219,21 @@ class SecureBackupService {
         throw const FormatException('Restored database की अंतिम जाँच असफल हुई।');
       }
 
-      if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
+      // Restore is committed after integrity_check. Cleanup failures must
+      // not trigger rollback after any rollback copy has already been removed.
       for (final rootName in movedOldRoots) {
         final old = Directory(oldPaths[rootName]!);
-        if (await old.exists()) await old.delete(recursive: true);
+        try {
+          if (await old.exists()) await old.delete(recursive: true);
+        } catch (_) {
+          // Leave the previous copy for manual/next-start cleanup; restored
+          // records and their new attachments are already valid.
+        }
+      }
+      try {
+        if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
+      } catch (_) {
+        // A stale encrypted rollback file is safer than undoing a valid restore.
       }
     } catch (_) {
       await LocalDatabase.instance.closeForRestore();

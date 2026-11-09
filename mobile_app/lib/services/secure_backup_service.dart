@@ -6,7 +6,8 @@ import 'package:archive/archive.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'secure_database_key.dart';
 
 import '../data/local_database.dart';
 
@@ -31,6 +32,10 @@ class SecureBackupService {
     final archive = Archive();
     final dbBytes = await dbFile.readAsBytes();
     archive.addFile(ArchiveFile('database/court_case_manager.db', dbBytes.length, dbBytes));
+    final databaseKey = await SecureDatabaseKey.instance.read();
+    if (databaseKey == null) throw StateError('Database encryption key is unavailable');
+    final keyBytes = utf8.encode(databaseKey);
+    archive.addFile(ArchiveFile('database/sqlcipher_key.txt', keyBytes.length, keyBytes));
 
     final appDir = await getApplicationDocumentsDirectory();
     final docsDir = Directory(p.join(appDir.path, 'case_documents'));
@@ -93,28 +98,40 @@ class SecureBackupService {
       throw const FormatException('Backup में database मौजूद नहीं है।');
     }
     final dbBytes = Uint8List.fromList(dbEntry.content as List<int>);
-    const sqliteHeader = 'SQLite format 3\u0000';
-    if (dbBytes.length < 100 ||
-        utf8.decode(dbBytes.sublist(0, 16), allowMalformed: true) != sqliteHeader) {
-      throw const FormatException('Backup database की जाँच असफल हुई।');
+    final keyEntry = archive.findFile('database/sqlcipher_key.txt');
+    if (keyEntry == null || !keyEntry.isFile) {
+      throw const FormatException('Backup में database encryption key मौजूद नहीं है।');
+    }
+    final backupDatabaseKey = utf8.decode(keyEntry.content as List<int>);
+    if (base64Url.decode(backupDatabaseKey).length != 32) {
+      throw const FormatException('Backup database key अमान्य है।');
     }
 
-    // Validate the restored DB in a temporary file before touching current data.
+    // Validate the encrypted DB with its bundled key before touching current data.
     final tempRoot = await getTemporaryDirectory();
     final validationPath = p.join(tempRoot.path, 'ccm_restore_validation.db');
     final validationFile = File(validationPath);
-    if (await validationFile.exists()) await validationFile.delete();
+    for (final suffix in ['', '-wal', '-shm']) {
+      final stale = File('$validationPath$suffix');
+      if (await stale.exists()) await stale.delete();
+    }
     await validationFile.writeAsBytes(dbBytes, flush: true);
     Database? validationDb;
     try {
-      validationDb = await openDatabase(validationPath, readOnly: true);
+      validationDb = await openDatabase(validationPath, password: backupDatabaseKey, readOnly: true);
       final check = await validationDb.rawQuery('PRAGMA integrity_check');
       if (check.isEmpty || check.first.values.first != 'ok') {
-        throw const FormatException('Database integrity check असफल हुई।');
+        throw const FormatException('Encrypted database integrity check असफल हुई।');
       }
+      final tables = await validationDb.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+      if (tables.isEmpty) throw const FormatException('Backup database खाली या अमान्य है।');
     } finally {
       await validationDb?.close();
-      if (await validationFile.exists()) await validationFile.delete();
+      for (final suffix in ['', '-wal', '-shm']) {
+        final stale = File('$validationPath$suffix');
+        if (await stale.exists()) await stale.delete();
+      }
     }
 
     final appDir = await getApplicationDocumentsDirectory();
@@ -138,7 +155,12 @@ class SecureBackupService {
     final currentPath = await LocalDatabase.instance.databasePath();
     final currentFile = File(currentPath);
     final rollbackPath = '$currentPath.restore_previous';
+    final liveDocs = Directory(p.join(appDir.path, 'case_documents'));
+    final oldDocs = Directory(p.join(appDir.path, 'case_documents_restore_previous'));
+    final previousDatabaseKey = await SecureDatabaseKey.instance.read();
     if (await currentFile.exists()) await currentFile.copy(rollbackPath);
+    if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
+    if (await liveDocs.exists()) await liveDocs.rename(oldDocs.path);
     try {
       await LocalDatabase.instance.closeForRestore();
       for (final suffix in ['', '-wal', '-shm']) {
@@ -146,20 +168,25 @@ class SecureBackupService {
         if (await old.exists()) await old.delete();
       }
       await File(currentPath).writeAsBytes(dbBytes, flush: true);
-
-      final liveDocs = Directory(p.join(appDir.path, 'case_documents'));
-      if (await liveDocs.exists()) await liveDocs.delete(recursive: true);
+      await SecureDatabaseKey.instance.replace(backupDatabaseKey);
       if (await staging.exists()) await staging.rename(liveDocs.path);
-      await LocalDatabase.instance.database; // Re-open and verify the restored DB.
-      if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
-    } catch (_) {
-      if (await File(rollbackPath).exists()) {
-        for (final suffix in ['', '-wal', '-shm']) {
-          final sidecar = File('$currentPath$suffix');
-          if (await sidecar.exists()) await sidecar.delete();
-        }
-        await File(rollbackPath).copy(currentPath);
+      final restoredDb = await LocalDatabase.instance.database;
+      final check = await restoredDb.rawQuery('PRAGMA integrity_check');
+      if (check.isEmpty || check.first.values.first != 'ok') {
+        throw const FormatException('Restored database की अंतिम जाँच असफल हुई।');
       }
+      if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
+      if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
+    } catch (_) {
+      await LocalDatabase.instance.closeForRestore();
+      for (final suffix in ['', '-wal', '-shm']) {
+        final sidecar = File('$currentPath$suffix');
+        if (await sidecar.exists()) await sidecar.delete();
+      }
+      if (await File(rollbackPath).exists()) await File(rollbackPath).copy(currentPath);
+      if (previousDatabaseKey != null) await SecureDatabaseKey.instance.replace(previousDatabaseKey);
+      if (await liveDocs.exists()) await liveDocs.delete(recursive: true);
+      if (await oldDocs.exists()) await oldDocs.rename(liveDocs.path);
       rethrow;
     }
   }

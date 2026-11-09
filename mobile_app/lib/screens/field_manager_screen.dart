@@ -64,7 +64,7 @@ class _FieldManagerScreenState extends State<FieldManagerScreen> {
           CheckboxListTile(value: requiredField, contentPadding: EdgeInsets.zero,
             title: const Text('अनिवार्य फील्ड'), onChanged: (v) => setDialog(() => requiredField = v ?? false)),
           DropdownButtonFormField<String>(initialValue: roles,
-            decoration: const InputDecoration(labelText: 'किसे बदलाव की अनुमति?'),
+            decoration: const InputDecoration(labelText: 'भूमिका मेटाडेटा (login लागू होने पर)'),
             items: const [
               DropdownMenuItem(value: 'admin', child: Text('केवल Admin')),
               DropdownMenuItem(value: 'admin,staff', child: Text('Admin और अधिकृत कर्मचारी')),

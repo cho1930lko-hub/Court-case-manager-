@@ -4,6 +4,7 @@ import 'screens/cases_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/court_documents_screen.dart';
 import 'screens/case_activity_screen.dart';
+import 'screens/case_preparation_screen.dart';
 import 'screens/case_documents_screen.dart';
 import 'screens/audit_log_screen.dart';
 import 'screens/backup_screen.dart';
@@ -402,6 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _ModuleTile(icon: Icons.contact_phone_rounded, title: 'Address Book', subtitle: 'अधिकारी, गवाह और विभागीय संपर्क', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: addressConfig))),
                 _ModuleTile(icon: Icons.description_rounded, title: 'समन एवं कार्यवाही आख्या', subtitle: 'मुकदमे के आधार पर प्रारूप तैयार करें', color: AppTheme.blue, onTap: () => _open(const CourtDocumentsScreen())),
                 _ModuleTile(icon: Icons.timeline_rounded, title: 'Timeline एवं Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित काम', color: AppTheme.teal, onTap: () => _open(const CaseActivityScreen())),
+                _ModuleTile(icon: Icons.event_available_rounded, title: 'अगली पेशी की तैयारी', subtitle: 'आगामी पेशी, लंबित कार्य और तैयारी का सारांश', color: AppTheme.blue, onTap: () => _open(const CasePreparationScreen())),
                 _ModuleTile(icon: Icons.folder_copy_rounded, title: 'दस्तावेज लाइब्रेरी', subtitle: 'केस फाइलें और पुराने संस्करण', color: AppTheme.teal, onTap: () => _open(const CaseDocumentsScreen())),
                 _ModuleTile(icon: Icons.security_rounded, title: 'Audit Log', subtitle: 'ऐप में दर्ज गतिविधियों का रिकॉर्ड', color: AppTheme.blue, onTap: () => _open(const AuditLogScreen())),
                 const SizedBox(height: 18),

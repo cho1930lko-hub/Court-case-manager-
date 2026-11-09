@@ -9,6 +9,7 @@ import 'screens/audit_log_screen.dart';
 import 'screens/backup_screen.dart';
 import 'screens/change_pin_screen.dart';
 import 'services/app_lock_service.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,25 +22,10 @@ class CourtCaseManagerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const navy = Color(0xFF1E2A4A);
     return MaterialApp(
       title: 'पैरवी रजिस्टर',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4169E1)),
-        scaffoldBackgroundColor: const Color(0xFFF4F6FB),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: navy,
-          foregroundColor: Colors.white,
-          centerTitle: false,
-        ),
-        cardTheme: CardThemeData(
-          elevation: 1,
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
+      theme: AppTheme.light,
       builder: (context, child) => AppLockGate(child: child ?? const SizedBox.shrink()),
       home: const HomeScreen(),
     );
@@ -184,24 +170,24 @@ class _HomeScreenState extends State<HomeScreen> {
     _counts = LocalDatabase.instance.dashboardCounts();
   }
 
-  void _refresh() {
-    setState(() => _counts = LocalDatabase.instance.dashboardCounts());
+  void _refresh() => setState(() => _counts = LocalDatabase.instance.dashboardCounts());
+
+  void _open(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen)).then((_) => _refresh());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('⚖️ पैरवी रजिस्टर', style: TextStyle(fontWeight: FontWeight.w700)),
-            Text('कोतवाली भिंगा, जनपद श्रावस्ती',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400)),
-          ],
-        ),
+        title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('पैरवी रजिस्टर'),
+          Text('कोतवाली भिंगा  •  जनपद श्रावस्ती',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400, color: Colors.white70)),
+        ]),
         actions: [
-          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
+          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded), tooltip: 'रिफ्रेश'),
+          const SizedBox(width: 4),
         ],
       ),
       body: FutureBuilder<Map<String, int>>(
@@ -211,120 +197,199 @@ class _HomeScreenState extends State<HomeScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Database error: ${snapshot.error}'));
+            return Center(child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('डेटाबेस खोलने में समस्या: ${snapshot.error}'),
+            ));
           }
-          final counts = snapshot.data!;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF263B68), Color(0xFF4169E1)],
+          final counts = snapshot.data ?? <String, int>{};
+          return RefreshIndicator(
+            onRefresh: () async => _refresh(),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      colors: [Color(0xFF14233F), Color(0xFF315E9E), Color(0xFF287E86)],
+                    ),
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: const [BoxShadow(color: Color(0x22315E9E), blurRadius: 18, offset: Offset(0, 8))],
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('आपका Offline Case Manager',
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 6),
-                    Text('डेटा इसी मोबाइल में सेव होगा। इंटरनेट या Google Sheets की जरूरत नहीं।',
-                        style: TextStyle(color: Colors.white70)),
-                    SizedBox(height: 12),
-                    Row(children: [
-                      Icon(Icons.offline_bolt, color: Colors.lightGreenAccent, size: 18),
-                      SizedBox(width: 6),
-                      Text('Local Database तैयार', style: TextStyle(color: Colors.white)),
+                  child: Stack(children: [
+                    const Positioned(right: 0, top: 0, child: Icon(Icons.account_balance_outlined, size: 76, color: Color(0x22FFFFFF))),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(30)),
+                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.offline_bolt_rounded, size: 14, color: Color(0xFF9EF0D0)),
+                          SizedBox(width: 5),
+                          Text('OFFLINE • LOCAL DATA', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .8)),
+                        ]),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('न्यायालयीन कार्यवाही\nअब एक ही जगह',
+                        style: TextStyle(color: Colors.white, fontSize: 23, height: 1.22, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 8),
+                      const Text('मुकदमे, पेशी, डाक और दस्तावेजों का व्यवस्थित प्रबंधन।',
+                        style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4)),
+                      const SizedBox(height: 15),
+                      Row(children: [
+                        const Icon(Icons.shield_outlined, size: 16, color: Color(0xFFB8F1DD)),
+                        const SizedBox(width: 6),
+                        const Text('डेटा इसी डिवाइस में सुरक्षित रहता है',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                      ]),
                     ]),
+                  ]),
+                ),
+                const SizedBox(height: 24),
+                _sectionHeading('रजिस्टर का सारांश', 'स्थानीय रिकॉर्ड'),
+                const SizedBox(height: 12),
+                GridView.count(
+                  crossAxisCount: 2, shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.72,
+                  children: [
+                    _StatCard(label: 'कुल मुकदमे', value: counts['cases'] ?? 0, icon: Icons.gavel_rounded, tint: const Color(0xFFEAF0FF), accent: const Color(0xFF315E9E)),
+                    _StatCard(label: 'डाक रजिस्टर', value: counts['dak'] ?? 0, icon: Icons.mark_email_unread_rounded, tint: const Color(0xFFE5F5F2), accent: const Color(0xFF168C83)),
+                    _StatCard(label: 'रिमांड रजिस्टर', value: counts['remand'] ?? 0, icon: Icons.assignment_turned_in_rounded, tint: const Color(0xFFFFF2E5), accent: const Color(0xFFC47B28)),
+                    _StatCard(label: 'दस्तावेज', value: counts['documents'] ?? 0, icon: Icons.folder_copy_rounded, tint: const Color(0xFFF1ECFF), accent: const Color(0xFF7655B5)),
+                    _StatCard(label: 'संपर्क', value: counts['contacts'] ?? 0, icon: Icons.contacts_rounded, tint: const Color(0xFFFFEDEF), accent: const Color(0xFFB64F66)),
                   ],
                 ),
-              ),
-              const SizedBox(height: 18),
-              const Text('रजिस्टर सारांश', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.7,
-                children: [
-                  _StatCard(label: 'कुल मुकदमे', value: counts['cases']!, icon: Icons.gavel),
-                  _StatCard(label: 'Dak Register', value: counts['dak']!, icon: Icons.markunread_mailbox),
-                  _StatCard(label: 'Rimand Register', value: counts['remand']!, icon: Icons.assignment),
-                  _StatCard(label: 'दस्तावेज', value: counts['documents']!, icon: Icons.folder),
-                  _StatCard(label: 'संपर्क', value: counts['contacts']!, icon: Icons.contacts),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Text('मुख्य मॉड्यूल', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              _ModuleTile(icon: Icons.folder_open, title: 'सेशन कोर्ट', subtitle: 'मुकदमे, पेशी, गवाह और स्थिति', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CasesScreen())).then((_) => _refresh())),
-              _ModuleTile(icon: Icons.mark_email_unread, title: 'Dak Register', subtitle: 'डाक प्रविष्टि और खोज', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: dakConfig))).then((_) => _refresh())),
-              _ModuleTile(icon: Icons.assignment, title: 'Rimand Register', subtitle: 'रिमांड का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: remandConfig))).then((_) => _refresh())),
-              _ModuleTile(icon: Icons.contacts, title: 'Address Book', subtitle: 'संपर्क और विभाग', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: addressConfig))).then((_) => _refresh())),
-              _ModuleTile(icon: Icons.description, title: 'समन एवं कार्यवाही आख्या', subtitle: 'मुकदमे से जुड़ा ड्राफ्ट तैयार करें', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CourtDocumentsScreen()))),
-              _ModuleTile(icon: Icons.timeline, title: 'Case Timeline & Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित कार्य', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseActivityScreen()))),
-              _ModuleTile(icon: Icons.folder_copy, title: 'Case Document Library', subtitle: 'मुकदमे की फाइलें और पुराने संस्करण', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseDocumentsScreen()))),
-              _ModuleTile(icon: Icons.security, title: 'Audit Log', subtitle: 'ऐप में दर्ज बदलावों का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditLogScreen()))),
-              _ModuleTile(icon: Icons.backup, title: 'Backup & Restore', subtitle: 'AES-256-GCM encrypted backup और restore', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BackupScreen()))),
-              _ModuleTile(icon: Icons.password, title: 'App PIN बदलें', subtitle: 'वर्तमान PIN से नया PIN सेट करें', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePinScreen()))),
-              const SizedBox(height: 12),
-              const Text('मुकदमे की कार्यवाही, चेकलिस्ट और दस्तावेज़ अब स्थानीय रूप से दर्ज किए जा सकते हैं.',
-                  style: TextStyle(color: Colors.black54)),
-            ],
+                const SizedBox(height: 25),
+                _sectionHeading('मुख्य कार्य', 'रजिस्टर और सुविधाएँ'),
+                const SizedBox(height: 12),
+                _ModuleTile(icon: Icons.account_balance_rounded, title: 'सेशन कोर्ट', subtitle: 'मुकदमे, पेशी, गवाह और स्थिति', color: const Color(0xFF315E9E), onTap: () => _open(const CasesScreen())),
+                _ModuleTile(icon: Icons.mark_email_unread_rounded, title: 'डाक रजिस्टर', subtitle: 'डाक प्रविष्टि, स्थिति और खोज', color: const Color(0xFF168C83), onTap: () => _open(const RegisterScreen(config: dakConfig))),
+                _ModuleTile(icon: Icons.assignment_rounded, title: 'रिमांड रजिस्टर', subtitle: 'रिमांड संबंधी विवरण', color: const Color(0xFFC47B28), onTap: () => _open(const RegisterScreen(config: remandConfig))),
+                _ModuleTile(icon: Icons.contact_phone_rounded, title: 'Address Book', subtitle: 'अधिकारी, गवाह और विभागीय संपर्क', color: const Color(0xFF7655B5), onTap: () => _open(const RegisterScreen(config: addressConfig))),
+                _ModuleTile(icon: Icons.description_rounded, title: 'समन एवं कार्यवाही आख्या', subtitle: 'मुकदमे के आधार पर प्रारूप तैयार करें', color: const Color(0xFF315E9E), onTap: () => _open(const CourtDocumentsScreen())),
+                _ModuleTile(icon: Icons.timeline_rounded, title: 'Timeline एवं Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित काम', color: const Color(0xFF168C83), onTap: () => _open(const CaseActivityScreen())),
+                _ModuleTile(icon: Icons.folder_copy_rounded, title: 'दस्तावेज लाइब्रेरी', subtitle: 'केस फाइलें और पुराने संस्करण', color: const Color(0xFF7655B5), onTap: () => _open(const CaseDocumentsScreen())),
+                _ModuleTile(icon: Icons.security_rounded, title: 'Audit Log', subtitle: 'ऐप में दर्ज गतिविधियों का रिकॉर्ड', color: const Color(0xFFB06B2A), onTap: () => _open(const AuditLogScreen())),
+                const SizedBox(height: 18),
+                _sectionHeading('सुरक्षा एवं बैकअप', 'डिवाइस प्रबंधन'),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: _UtilityTile(icon: Icons.enhanced_encryption_rounded, title: 'Backup & Restore', onTap: () => _open(const BackupScreen()))),
+                  const SizedBox(width: 10),
+                  Expanded(child: _UtilityTile(icon: Icons.password_rounded, title: 'PIN बदलें', onTap: () => _open(const ChangePinScreen()))),
+                ]),
+                const SizedBox(height: 18),
+                const Center(child: Text('पैरवी रजिस्टर  •  Offline Case Manager',
+                  style: TextStyle(color: Color(0xFF8995A7), fontSize: 11, fontWeight: FontWeight.w600))),
+              ],
+            ),
           );
         },
       ),
     );
   }
+
+  Widget _sectionHeading(String title, String subtitle) => Row(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 2),
+        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+      ])),
+    ],
+  );
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value, required this.icon});
+  const _StatCard({required this.label, required this.value, required this.icon, required this.tint, required this.accent});
   final String label;
   final int value;
   final IconData icon;
+  final Color tint;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: const Color(0xFF4169E1)),
-          const SizedBox(height: 8),
-          Text('$value', style: const TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
-          Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
-        ],
-      ),
+      padding: const EdgeInsets.all(13),
+      child: Row(children: [
+        Container(width: 42, height: 42,
+          decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(13)),
+          child: Icon(icon, color: accent, size: 21)),
+        const SizedBox(width: 11),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text('$value', style: TextStyle(fontSize: 23, height: 1.1, fontWeight: FontWeight.w800, color: accent)),
+          const SizedBox(height: 4),
+          Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF68778D), fontWeight: FontWeight.w600)),
+        ])),
+      ]),
     ),
   );
 }
 
 class _ModuleTile extends StatelessWidget {
-  const _ModuleTile({required this.icon, required this.title, required this.subtitle, this.onTap});
+  const _ModuleTile({required this.icon, required this.title, required this.subtitle, required this.color, required this.onTap});
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback? onTap;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
-      leading: CircleAvatar(
-        backgroundColor: const Color(0xFFEAF0FF),
-        child: Icon(icon, color: const Color(0xFF3158B7)),
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 9),
+    child: Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE5EAF1))),
+          child: Row(children: [
+            Container(width: 44, height: 44,
+              decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(14)),
+              child: Icon(icon, color: color, size: 22)),
+            const SizedBox(width: 13),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF172B4D))),
+              const SizedBox(height: 3),
+              Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF68778D))),
+            ])),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF9AA6B6)),
+          ]),
+        ),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap ?? () => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$title मॉड्यूल अगले विकास चरण में जोड़ा जाएगा।')),
+    ),
+  );
+}
+
+class _UtilityTile extends StatelessWidget {
+  const _UtilityTile({required this.icon, required this.title, required this.onTap});
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE5EAF1))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, color: const Color(0xFF315E9E), size: 23),
+          const SizedBox(height: 10),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+        ]),
       ),
     ),
   );

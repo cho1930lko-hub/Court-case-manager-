@@ -15,6 +15,43 @@ class _CasesScreenState extends State<CasesScreen> {
   final _search = TextEditingController();
   List<Map<String, Object?>> _cases = [];
   bool _loading = true;
+  String _filter = 'सभी';
+
+  List<Map<String, Object?>> get _visibleCases {
+    final rows = _cases.where((row) {
+      final status = (row['status'] ?? 'साक्ष्य').toString();
+      switch (_filter) {
+        case 'आगामी पेशी':
+          final date = _parseHearingDate(row['next_hearing']?.toString() ?? '');
+          return date != null && !date.isBefore(DateUtils.dateOnly(DateTime.now()));
+        case 'NBW': return status.contains('NBW');
+        case 'बहस': return status == 'बहस';
+        case 'साक्ष्य': return status == 'साक्ष्य' || status == 'सफाई साक्ष्य';
+        case 'अन्य': return !['NBW', 'बहस', 'साक्ष्य', 'सफाई साक्ष्य'].any((v) => status.contains(v));
+        default: return true;
+      }
+    }).toList();
+    if (_filter == 'आगामी पेशी') {
+      rows.sort((a, b) {
+        final da = _parseHearingDate(a['next_hearing']?.toString() ?? '') ?? DateTime(9999);
+        final db = _parseHearingDate(b['next_hearing']?.toString() ?? '') ?? DateTime(9999);
+        return da.compareTo(db);
+      });
+    }
+    return rows;
+  }
+
+  DateTime? _parseHearingDate(String value) {
+    final parts = value.trim().split('/');
+    if (parts.length != 3) return DateTime.tryParse(value.trim());
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+    final date = DateTime(year, month, day);
+    if (date.day != day || date.month != month || date.year != year) return null;
+    return DateUtils.dateOnly(date);
+  }
 
   @override
   void initState() {
@@ -125,7 +162,7 @@ class _CasesScreenState extends State<CasesScreen> {
               children: [
                 const Text('मुकदमा प्रबंधन', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 5),
-                Text('${_cases.length} रिकॉर्ड सूची में', style: const TextStyle(color: Color(0xFFD4DEED), fontSize: 13)),
+                Text('${_visibleCases.length} / ${_cases.length} रिकॉर्ड', style: const TextStyle(color: Color(0xFFD4DEED), fontSize: 13)),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _search,
@@ -145,19 +182,38 @@ class _CasesScreenState extends State<CasesScreen> {
               ],
             ),
           ),
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              children: [
+                for (final filter in ['सभी', 'आगामी पेशी', 'NBW', 'बहस', 'साक्ष्य', 'अन्य'])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 7),
+                    child: ChoiceChip(
+                      label: Text(filter),
+                      selected: _filter == filter,
+                      onSelected: (_) => setState(() => _filter = filter),
+                      showCheckmark: false,
+                    ),
+                  ),
+              ],
+            ),
+          ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _cases.isEmpty
-                    ? _EmptyCases(searching: _search.text.isNotEmpty, onAdd: () => _editCase(), onClear: _search.clear)
+                : _visibleCases.isEmpty
+                    ? _EmptyCases(searching: _search.text.isNotEmpty || _filter != 'सभी', onAdd: () => _editCase(), onClear: () { _search.clear(); setState(() => _filter = 'सभी'); })
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                          itemCount: _cases.length,
+                          itemCount: _visibleCases.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 11),
                           itemBuilder: (context, index) {
-                            final row = _cases[index];
+                            final row = _visibleCases[index];
                             final status = (row['status'] ?? 'साक्ष्य').toString();
                             return Card(
                               child: InkWell(

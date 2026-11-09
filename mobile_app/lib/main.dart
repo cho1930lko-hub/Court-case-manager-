@@ -93,7 +93,7 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   Future<void> _submit() async {
     if (_busy) return;
     FocusScope.of(context).unfocus();
-    if (!RegExp(r'^\\d{6,8}$').hasMatch(_pin.text)) {
+    if (!AppLockService.isValidPinFormat(_pin.text)) {
       setState(() => _error = 'PIN में 6 से 8 अंक होने चाहिए।');
       return;
     }

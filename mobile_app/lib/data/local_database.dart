@@ -697,6 +697,7 @@ class LocalDatabase {
     required String action,
     required String module,
     required String details,
+    Map<String, String> customFieldValues = const {},
   }) async {
     const allowed = {'cases', 'dak_register', 'remand_register', 'address_book', 'evidence_items'};
     if (!allowed.contains(table)) throw ArgumentError('Unsupported table: $table');
@@ -718,6 +719,14 @@ class LocalDatabase {
               table == 'dak_register') 'updated_at': now,
         }, where: 'id = ?', whereArgs: [recordId]);
         if (changed != 1) throw StateError('Record not found for update');
+      }
+      for (final entry in customFieldValues.entries) {
+        await txn.insert('custom_field_values', {
+          'id': '${module}_${recordId}_${entry.key}',
+          'module': module, 'record_id': recordId,
+          'field_id': entry.key, 'value': entry.value,
+          'updated_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await _insertAudit(txn, action, module, recordId, details);
     });

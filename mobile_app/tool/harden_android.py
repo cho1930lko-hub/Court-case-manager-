@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Harden generated Android project: disable backup and enable FLAG_SECURE."""
+"""Harden generated Android project: disable Android cloud/device backup."""
 import re
 import sys
 from pathlib import Path
@@ -25,16 +25,9 @@ RULES = """<?xml version="1.0" encoding="utf-8"?>
 </data-extraction-rules>
 """
 ACTIVITY_BODY = """
-import android.os.Bundle
-import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 
-class MainActivity : FlutterActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-        super.onCreate(savedInstanceState)
-    }
-}
+class MainActivity : FlutterActivity()
 """
 
 def fail(message):
@@ -63,7 +56,7 @@ def patch_activity():
         fail("MainActivity.kt not found; Kotlin template required")
     path = found[0]
     source = path.read_text(encoding="utf-8")
-    if "FLAG_SECURE" in source:
+    if "FLAG_SECURE" not in source and "WindowManager" not in source:
         return
     package = next((line for line in source.splitlines() if line.strip().startswith("package ")), None)
     if package is None:

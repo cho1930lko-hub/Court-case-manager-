@@ -62,11 +62,23 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
     if (result == null || result.files.single.path == null) return null;
     final source = File(result.files.single.path!);
     final root = await getApplicationDocumentsDirectory();
-    final folder = Directory(p.join(root.path, 'evidence', caseId));
+    // Keep newly picked files in a temporary folder until the user saves the
+    // evidence form. Cancelling the form must not leave an orphan attachment.
+    final folder = Directory(p.join(root.path, 'evidence_pending'));
     await folder.create(recursive: true);
     final target = p.join(folder.path, '${const Uuid().v4()}_${p.basename(source.path)}');
     await source.copy(target);
     return target;
+  }
+
+  Future<void> _cleanupPendingEvidenceFiles() async {
+    final root = await getApplicationDocumentsDirectory();
+    final pending = Directory(p.join(root.path, 'evidence_pending'));
+    if (await pending.exists()) {
+      await for (final entity in pending.list(followLinks: false)) {
+        if (entity is File) await entity.delete();
+      }
+    }
   }
 
   Future<void> _edit([Map<String, Object?>? item]) async {
@@ -83,10 +95,26 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
         onAttach: _copyAttachment,
       ),
     );
-    if (result == null) return;
+    if (result == null) {
+      await _cleanupPendingEvidenceFiles();
+      return;
+    }
     setState(() => _saving = true);
+    String? newlyInstalledPath;
     try {
       final id = (item?['id'] ?? const Uuid().v4()).toString();
+      final submittedPath = result['local_path']?.toString() ?? '';
+      if (submittedPath.isNotEmpty &&
+          p.basename(p.dirname(submittedPath)) == 'evidence_pending') {
+        final root = await getApplicationDocumentsDirectory();
+        final caseId = result['case_id'].toString();
+        final destinationDir = Directory(p.join(root.path, 'evidence', caseId));
+        await destinationDir.create(recursive: true);
+        final destination = p.join(destinationDir.path, p.basename(submittedPath));
+        newlyInstalledPath = destination;
+        await File(submittedPath).rename(destination);
+        result['local_path'] = destination;
+      }
       await LocalDatabase.instance.saveEvidence(result, id: item?['id']?.toString());
       await LocalDatabase.instance.logAction(
         item == null ? 'EVIDENCE_CREATED' : 'EVIDENCE_UPDATED',
@@ -97,6 +125,11 @@ class _EvidenceScreenState extends State<EvidenceScreen> {
       _caseId = result['case_id']?.toString() ?? _caseId;
       await _load();
     } catch (e) {
+      if (newlyInstalledPath != null) {
+        final failedFile = File(newlyInstalledPath);
+        if (await failedFile.exists()) await failedFile.delete();
+      }
+      await _cleanupPendingEvidenceFiles();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('साक्ष्य सेव नहीं हुआ: $e')),

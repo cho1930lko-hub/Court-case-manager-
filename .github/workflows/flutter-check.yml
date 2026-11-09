@@ -1,0 +1,29 @@
+name: Flutter checks
+
+on:
+  push:
+    branches: [android-offline-v1]
+    paths:
+      - 'mobile_app/**'
+      - '.github/workflows/flutter-check.yml'
+  pull_request:
+    branches: [android-offline-v1]
+    paths:
+      - 'mobile_app/**'
+      - '.github/workflows/flutter-check.yml'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter analyze

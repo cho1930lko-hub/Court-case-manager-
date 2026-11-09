@@ -13,7 +13,7 @@ on:
       - '.github/workflows/flutter-check.yml'
 
 jobs:
-  analyze:
+  analyze-test-android:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,3 +27,18 @@ jobs:
       - run: flutter --version
       - run: flutter pub get
       - run: flutter analyze
+      - run: flutter test
+      - name: Generate Android platform project
+        run: flutter create --platforms=android --org in.gov.courtcases --project-name court_case_manager .
+      - name: Add SQLCipher ProGuard keep rules
+        run: |
+          mkdir -p android/app
+          printf '%s\n' '-keep class net.sqlcipher.** { *; }' >> android/app/proguard-rules.pro
+      - name: Build debug APK
+        run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: court-case-manager-debug-apk
+          path: mobile_app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

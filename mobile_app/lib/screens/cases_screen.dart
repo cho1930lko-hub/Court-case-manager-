@@ -448,7 +448,7 @@ class _CaseFormState extends State<_CaseForm> {
           final current = customDropdowns[id];
           return Padding(padding: const EdgeInsets.only(bottom: 12),
             child: DropdownButtonFormField<String>(
-              value: current != null && current.isNotEmpty && options.any((o) => o['option_label'] == current) ? current : null,
+              initialValue: current != null && current.isNotEmpty && options.any((o) => o['option_label'] == current) ? current : null,
               decoration: InputDecoration(labelText: requiredField ? '$label *' : label),
               items: options.map((o) => DropdownMenuItem(value: o['option_label'].toString(), child: Text(o['option_label'].toString()))).toList(),
               onChanged: (v) => setState(() => customDropdowns[id] = v ?? ''),

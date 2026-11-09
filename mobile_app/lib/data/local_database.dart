@@ -263,6 +263,75 @@ class LocalDatabase {
   }
 
 
+  /// Searches all primary registers without changing or copying stored records.
+  Future<List<Map<String, Object?>>> globalSearch(String query) async {
+    final db = await database;
+    final q = query.trim();
+    if (q.length < 2) return [];
+    final like = '%$q%';
+    return db.rawQuery('''
+      SELECT * FROM (
+        SELECT 'मुकदमा' AS record_type, c.id AS record_id,
+          COALESCE(c.st_no, '') AS title,
+          'FIR: ' || COALESCE(c.fir_no, '') || ' • ' ||
+          COALESCE(c.accused_name, '') AS subtitle,
+          COALESCE(c.court_name, '') AS detail,
+          COALESCE(c.updated_at, '') AS sort_date
+        FROM cases c
+        WHERE c.is_archived = 0 AND (
+          c.st_no LIKE ? OR c.fir_no LIKE ? OR c.accused_name LIKE ? OR
+          c.sections LIKE ? OR c.court_name LIKE ? OR c.summoned_witnesses LIKE ?
+        )
+        UNION ALL
+        SELECT 'डाक' AS record_type, d.id AS record_id,
+          'ST No. ' || COALESCE(d.st_no, '') AS title,
+          COALESCE(d.dak_type, '') || ' • ' || COALESCE(d.accused_name, '') AS subtitle,
+          COALESCE(d.court_name, '') || ' • ' || COALESCE(d.remarks, '') AS detail,
+          COALESCE(d.updated_at, d.created_at, '') AS sort_date
+        FROM dak_register d
+        WHERE d.st_no LIKE ? OR d.accused_name LIKE ? OR d.status LIKE ? OR
+          d.dak_type LIKE ? OR d.person_address LIKE ? OR d.related_station LIKE ? OR
+          d.court_name LIKE ? OR d.remarks LIKE ?
+        UNION ALL
+        SELECT 'रिमांड' AS record_type, r.id AS record_id,
+          'FIR No. ' || COALESCE(r.fir_no, '') AS title,
+          COALESCE(r.accused_details, '') AS subtitle,
+          COALESCE(r.sections, '') || ' • ' || COALESCE(r.court_name, '') ||
+          ' • ' || COALESCE(r.investigating_officer, '') AS detail,
+          COALESCE(r.remand_date, r.created_at, '') AS sort_date
+        FROM remand_register r
+        WHERE r.fir_no LIKE ? OR r.sections LIKE ? OR r.court_name LIKE ? OR
+          r.investigating_officer LIKE ? OR r.accused_details LIKE ?
+        UNION ALL
+        SELECT 'संपर्क' AS record_type, a.id AS record_id,
+          a.name AS title,
+          COALESCE(a.department, '') || ' • ' || COALESCE(a.mobile, '') AS subtitle,
+          COALESCE(a.address, '') AS detail,
+          COALESCE(a.created_at, '') AS sort_date
+        FROM address_book a
+        WHERE a.name LIKE ? OR a.mobile LIKE ? OR a.department LIKE ? OR a.address LIKE ?
+        UNION ALL
+        SELECT 'दस्तावेज' AS record_type, d.id AS record_id,
+          d.name AS title,
+          COALESCE(d.category, '') || ' • ST No. ' || COALESCE(c.st_no, '') AS subtitle,
+          COALESCE(d.remarks, '') AS detail,
+          COALESCE(d.created_at, '') AS sort_date
+        FROM case_documents d
+        LEFT JOIN cases c ON c.id = d.case_id
+        WHERE d.name LIKE ? OR d.category LIKE ? OR d.remarks LIKE ? OR
+          c.st_no LIKE ? OR c.fir_no LIKE ? OR c.accused_name LIKE ?
+      ) results
+      ORDER BY sort_date DESC
+      LIMIT 200
+    ''', [
+      like, like, like, like, like, like,
+      like, like, like, like, like, like, like, like,
+      like, like, like, like, like,
+      like, like, like, like,
+      like, like, like, like, like, like,
+    ]);
+  }
+
   /// Aggregated preparation data for the upcoming-hearing workspace.
   /// Reads existing tables only; no schema or record migration is required.
   Future<List<Map<String, Object?>>> casePreparationSummary() async {

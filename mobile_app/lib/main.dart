@@ -3,6 +3,9 @@ import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/court_documents_screen.dart';
+import 'screens/case_activity_screen.dart';
+import 'screens/case_documents_screen.dart';
+import 'screens/audit_log_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -138,10 +141,12 @@ class _HomeScreenState extends State<HomeScreen> {
               _ModuleTile(icon: Icons.assignment, title: 'Rimand Register', subtitle: 'रिमांड का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: remandConfig))).then((_) => _refresh())),
               _ModuleTile(icon: Icons.contacts, title: 'Address Book', subtitle: 'संपर्क और विभाग', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: addressConfig))).then((_) => _refresh())),
               _ModuleTile(icon: Icons.description, title: 'समन एवं कार्यवाही आख्या', subtitle: 'मुकदमे से जुड़ा ड्राफ्ट तैयार करें', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CourtDocumentsScreen()))),
-              const _ModuleTile(icon: Icons.history, title: 'Case Timeline & Checklist', subtitle: 'कार्यवाही का इतिहास और लंबित कार्य'),
+              _ModuleTile(icon: Icons.timeline, title: 'Case Timeline & Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित कार्य', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseActivityScreen()))),
+              _ModuleTile(icon: Icons.folder_copy, title: 'Case Document Library', subtitle: 'मुकदमे की फाइलें और पुराने संस्करण', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaseDocumentsScreen()))),
+              _ModuleTile(icon: Icons.security, title: 'Audit Log', subtitle: 'ऐप में दर्ज बदलावों का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditLogScreen()))),
               const _ModuleTile(icon: Icons.backup, title: 'Backup & Export', subtitle: 'Excel और सुरक्षित ZIP बैकअप'),
               const SizedBox(height: 12),
-              const Text('प्रारंभिक आधार तैयार है। अगले चरण में रिकॉर्ड जोड़ने, संपादित करने, खोजने और बैकअप की स्क्रीन जोड़ी जाएँगी.',
+              const Text('मुकदमे की कार्यवाही, चेकलिस्ट और दस्तावेज़ अब स्थानीय रूप से दर्ज किए जा सकते हैं.',
                   style: TextStyle(color: Colors.black54)),
             ],
           );

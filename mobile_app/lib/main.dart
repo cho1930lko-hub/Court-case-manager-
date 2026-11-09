@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/court_documents_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -136,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _ModuleTile(icon: Icons.mark_email_unread, title: 'Dak Register', subtitle: 'डाक प्रविष्टि और खोज', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: dakConfig))).then((_) => _refresh())),
               _ModuleTile(icon: Icons.assignment, title: 'Rimand Register', subtitle: 'रिमांड का रिकॉर्ड', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: remandConfig))).then((_) => _refresh())),
               _ModuleTile(icon: Icons.contacts, title: 'Address Book', subtitle: 'संपर्क और विभाग', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen(config: addressConfig))).then((_) => _refresh())),
+              _ModuleTile(icon: Icons.description, title: 'समन एवं कार्यवाही आख्या', subtitle: 'मुकदमे से जुड़ा ड्राफ्ट तैयार करें', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CourtDocumentsScreen()))),
               const _ModuleTile(icon: Icons.history, title: 'Case Timeline & Checklist', subtitle: 'कार्यवाही का इतिहास और लंबित कार्य'),
               const _ModuleTile(icon: Icons.backup, title: 'Backup & Export', subtitle: 'Excel और सुरक्षित ZIP बैकअप'),
               const SizedBox(height: 12),

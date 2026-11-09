@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'data/local_database.dart';
@@ -18,6 +19,64 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Replace Flutter's opaque red error screen with a readable diagnostic
+  // page. This makes device-only startup/build exceptions visible to users.
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+  };
+  ErrorWidget.builder = (details) => Material(
+    color: const Color(0xFFF3F6FA),
+    child: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Color(0xFFB5473C)),
+                const SizedBox(height: 16),
+                const Text(
+                  'ऐप की स्क्रीन खोलने में त्रुटि हुई',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF172B4D)),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'कृपया नीचे दिया गया त्रुटि संदेश सहायता के लिए साझा करें। ऐप का डेटा Clear या Uninstall न करें।',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Color(0xFF68778D)),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5EAF1)),
+                  ),
+                  child: SelectableText(
+                    details.exceptionAsString(),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFAC4038)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  ui.PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught platform error: $error');
+    debugPrintStack(stackTrace: stack);
+    return true;
+  };
+
   runApp(const CourtCaseManagerApp());
 }
 

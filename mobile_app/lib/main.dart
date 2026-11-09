@@ -11,6 +11,7 @@ import 'screens/audit_log_screen.dart';
 import 'screens/backup_screen.dart';
 import 'screens/global_search_screen.dart';
 import 'screens/evidence_screen.dart';
+import 'screens/app_lock_gate.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -87,7 +88,7 @@ class CourtCaseManagerApp extends StatelessWidget {
       theme: AppTheme.light,
       // Keep the Navigator/MaterialApp intact. The lock is the home route,
       // not a MaterialApp.builder overlay that can hide route/dialog content.
-      home: const HomeScreen(),
+      home: const AppLockGate(child: HomeScreen()),
     );
   }
 }

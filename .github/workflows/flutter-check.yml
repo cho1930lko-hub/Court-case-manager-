@@ -101,12 +101,12 @@ jobs:
           patched = []
           for gradle_file in pub_cache.glob("*/android/build.gradle*"):
               source = gradle_file.read_text()
-              updated = re.sub(r"(compileSdkVersion\\s+)(?:flutter\\.compileSdkVersion|[0-9]+)", r"\\g<1>36", source)
-              updated = re.sub(r"(compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|[0-9]+)", r"\\g<1>36", updated)
+              updated = re.sub(r"(compileSdkVersion\s+)(?:flutter\.compileSdkVersion|[0-9]+)", r"\g<1>36", source)
+              updated = re.sub(r"(compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|[0-9]+)", r"\g<1>36", updated)
               if updated != source:
                   gradle_file.write_text(updated)
                   patched.append(str(gradle_file))
-          print("Patched plugin Gradle files:", *patched, sep="\\n")
+          print("Patched plugin Gradle files:", *patched, sep="\n")
           file_picker = [p for p in patched if "/file_picker-" in p]
           if not file_picker:
               raise SystemExit("file_picker Android Gradle compileSdk was not patched")

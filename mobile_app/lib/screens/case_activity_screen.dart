@@ -79,7 +79,7 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedCase = _cases.where((c) => c['id']?.toString() == _caseId).firstOrNull;
+    final matchingCases = _cases.where((c) => c['id']?.toString() == _caseId);\n    final selectedCase = matchingCases.isEmpty ? null : matchingCases.first;
     final pending = _tasks.where((t) => t['status'] != 'पूर्ण').length;
     final completed = _tasks.length - pending;
     return Scaffold(
@@ -204,7 +204,7 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
             children: [
               Row(children: [
                 const Expanded(child: Text('कार्य पूर्णता', style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.ink))),
-                Text('$completedCountPlaceholder', style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+                Text('$completed / ${_tasks.length} पूर्ण', style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
               ]),
               const SizedBox(height: 9),
               ClipRRect(borderRadius: BorderRadius.circular(8),

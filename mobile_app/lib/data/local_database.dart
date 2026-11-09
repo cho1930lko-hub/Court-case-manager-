@@ -1,5 +1,7 @@
 import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
+import 'dart:io';
+import 'package:sqflite_sqlcipher/sqflite.dart';
+import '../services/secure_database_key.dart';
 
 /// Local-first database. No network or Google account is required.
 /// Schema is additive: future upgrades must use versioned migrations.
@@ -13,8 +15,12 @@ class LocalDatabase {
     if (_db != null) return _db!;
     final root = await getDatabasesPath();
     final path = p.join(root, 'court_case_manager.db');
+    final key = await SecureDatabaseKey.instance.read() ??
+        await SecureDatabaseKey.instance.create();
+    await _migratePlainDatabaseIfNeeded(path, key);
     _db = await openDatabase(
       path,
+      password: key,
       version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
@@ -26,6 +32,67 @@ class LocalDatabase {
       },
     );
     return _db!;
+  }
+
+  Future<void> _migratePlainDatabaseIfNeeded(String path, String key) async {
+    final source = File(path);
+    if (!await source.exists() || await source.length() == 0) return;
+    final handle = await source.open();
+    final header = await handle.read(16);
+    await handle.close();
+    const sqliteHeader = [83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32, 51, 0];
+    final isPlainSqlite = header.length == sqliteHeader.length &&
+        List.generate(header.length, (i) => header[i] == sqliteHeader[i]).every((v) => v);
+    if (!isPlainSqlite) return; // Encrypted database: SQLCipher will validate the stored key on open.
+
+    final tempPath = '$path.sqlcipher_migrating';
+    for (final suffix in ['', '-wal', '-shm']) {
+      final stale = File('$tempPath$suffix');
+      if (await stale.exists()) await stale.delete();
+    }
+    Database? plainDb;
+    try {
+      plainDb = await openDatabase(path);
+      final escapedPath = tempPath.replaceAll("'", "''");
+      final escapedKey = key.replaceAll("'", "''");
+      await plainDb.execute("ATTACH DATABASE '$escapedPath' AS encrypted KEY '$escapedKey'");
+      await plainDb.rawQuery("SELECT sqlcipher_export('encrypted')");
+      await plainDb.execute('DETACH DATABASE encrypted');
+      await plainDb.close();
+      plainDb = null;
+
+      final migrated = File(tempPath);
+      if (!await migrated.exists() || await migrated.length() < 100) {
+        throw StateError('SQLCipher migration output is missing or incomplete.');
+      }
+      final verify = await openDatabase(tempPath, password: key, readOnly: true);
+      try {
+        final result = await verify.rawQuery('PRAGMA integrity_check');
+        if (result.isEmpty || result.first.values.first != 'ok') {
+          throw StateError('Encrypted database integrity check failed.');
+        }
+      } finally {
+        await verify.close();
+      }
+
+      final backupPath = '$path.plaintext_migration_backup';
+      if (await File(backupPath).exists()) await File(backupPath).delete();
+      await source.rename(backupPath);
+      try {
+        await migrated.rename(path);
+        await File(backupPath).delete();
+      } catch (_) {
+        if (await File(path).exists()) await File(path).delete();
+        await File(backupPath).rename(path);
+        rethrow;
+      }
+    } catch (_) {
+      await plainDb?.close();
+      rethrow; // Never delete or overwrite the original database on migration failure.
+    } finally {
+      final temp = File(tempPath);
+      if (await temp.exists()) await temp.delete();
+    }
   }
 
   Future<void> _createSchema(Database db, int version) async {

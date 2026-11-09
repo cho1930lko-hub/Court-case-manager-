@@ -24,7 +24,10 @@ class SecureBackupService {
   Future<Uint8List> createBackup(String password) async {
     _validatePassword(password);
     final db = await LocalDatabase.instance.database;
-    await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
+    final checkpoint = await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    if (checkpoint.isNotEmpty && (checkpoint.first['busy'] as int? ?? 0) != 0) {
+      throw StateError('Database checkpoint busy है; backup दोबारा प्रयास करें।');
+    }
     final dbPath = await LocalDatabase.instance.databasePath();
     final dbFile = File(dbPath);
     if (!await dbFile.exists()) throw StateError('Database file not found');
@@ -159,6 +162,11 @@ class SecureBackupService {
     final liveDocs = Directory(p.join(appDir.path, 'case_documents'));
     final oldDocs = Directory(p.join(appDir.path, 'case_documents_restore_previous'));
     final previousDatabaseKey = await SecureDatabaseKey.instance.read();
+    final liveDb = await LocalDatabase.instance.database;
+    final checkpoint = await liveDb.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+    if (checkpoint.isNotEmpty && (checkpoint.first['busy'] as int? ?? 0) != 0) {
+      throw StateError('Database checkpoint busy है; restore सुरक्षित रूप से शुरू नहीं किया जा सकता।');
+    }
     if (await currentFile.exists()) await currentFile.copy(rollbackPath);
     if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
     if (await liveDocs.exists()) await liveDocs.rename(oldDocs.path);

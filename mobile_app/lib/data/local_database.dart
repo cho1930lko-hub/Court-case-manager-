@@ -121,6 +121,13 @@ class LocalDatabase {
       )
     ''');
     await db.execute('''
+      CREATE TABLE generated_documents (
+        id TEXT PRIMARY KEY, case_id TEXT NOT NULL, document_type TEXT NOT NULL,
+        content TEXT NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY(case_id) REFERENCES cases(id)
+      )
+    ''');
+    await db.execute('''
       CREATE TABLE document_versions (
         id TEXT PRIMARY KEY, document_group_id TEXT NOT NULL,
         document_id TEXT NOT NULL, version_number INTEGER NOT NULL,
@@ -247,6 +254,22 @@ class LocalDatabase {
         if (table != 'remand_register') 'updated_at': now,
       }, where: 'id = ?', whereArgs: [id]);
     }
+  }
+
+  Future<void> saveGeneratedDocument({
+    required String id,
+    required String caseId,
+    required String type,
+    required String content,
+  }) async {
+    final db = await database;
+    await db.insert('generated_documents', {
+      'id': id,
+      'case_id': caseId,
+      'document_type': type,
+      'content': content,
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.abort);
   }
 
   Future<String> databasePath() async {

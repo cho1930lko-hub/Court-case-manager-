@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/local_database.dart';
 import '../theme/app_theme.dart';
-import 'import_export_screen.dart';
+import 'data_input_screen.dart';
 
 class RegisterField {
   const RegisterField(this.key, this.label, {this.lines = 1, this.required = false});
@@ -126,7 +126,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final config = widget.config;
     return Scaffold(
       appBar: AppBar(title: Text(config.title), actions: [
-        IconButton(tooltip: 'Excel Import / Export', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ImportExportScreen(initialModule: widget.config.table))), icon: const Icon(Icons.import_export_rounded)),
+        IconButton(tooltip: 'Excel Import / Export', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DataInputScreen(initialModule: widget.config.table))), icon: const Icon(Icons.import_export_rounded)),
         IconButton(tooltip: 'रीफ्रेश', onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
         const SizedBox(width: 4),
       ]),

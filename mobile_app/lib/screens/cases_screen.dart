@@ -53,12 +53,10 @@ class _CasesScreenState extends State<CasesScreen> {
     if (result == null) return;
     final id = (row?['id'] ?? const Uuid().v4()).toString();
     try {
-      await LocalDatabase.instance.saveCase({...result, 'id': id}, id: row?['id']?.toString());
-      await LocalDatabase.instance.logAction(
-        row == null ? 'CASE_CREATED' : 'CASE_UPDATED',
-        'SESSION_COURT',
-        id,
-        'ST NO: ${result['st_no']}',
+      await LocalDatabase.instance.saveWithAudit(
+        table: 'cases', values: result, recordId: id, isNew: row == null,
+        action: row == null ? 'CASE_CREATED' : 'CASE_UPDATED',
+        module: 'SESSION_COURT', details: 'ST NO: ${result['st_no']}',
       );
       await _load();
       if (mounted) {
@@ -87,8 +85,7 @@ class _CasesScreenState extends State<CasesScreen> {
     );
     if (yes != true) return;
     final id = row['id'].toString();
-    await LocalDatabase.instance.archiveCase(id);
-    await LocalDatabase.instance.logAction('CASE_ARCHIVED', 'SESSION_COURT', id, 'Soft archive');
+    await LocalDatabase.instance.archiveCaseWithAudit(id);
     await _load();
   }
 

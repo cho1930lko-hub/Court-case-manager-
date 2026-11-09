@@ -27,9 +27,19 @@ This folder is the new Flutter Android application. The existing Streamlit app a
 - Generated drafts are stored in the local SQLite database and logged in the audit log.
 - Draft preview is selectable and can be copied for review/editing.
 
+## Phase 3 progress
+
+- Case Timeline: date-wise case events can be recorded and reviewed.
+- Action Checklist: tasks can be added, assigned, given a due date, and marked complete/reopened.
+- Case Document Library: files are copied into app-private storage and linked to a selected case.
+- Document Version History: adding a revised file records a version entry and updates the current document pointer.
+- Audit Log viewer: recent recorded app actions can be reviewed in read-only form.
+
 ## Still pending
 
 - Full field-by-field parity with the existing Streamlit registers.
+- Document version history browsing/rollback and stronger file integrity checks.
+- Audit log tamper resistance/export and user/device attribution (currently local app log only).
 - Review and validation of date fields, duplicate rules, and required fields.
 - Automated tests and actual Android-device testing.
 - Android platform project generation and release APK build.

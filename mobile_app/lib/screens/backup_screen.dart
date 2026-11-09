@@ -125,7 +125,7 @@ class _BackupScreenState extends State<BackupScreen> {
       ),
       if (_working) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
       const SizedBox(height: 18),
-      const Text('महत्वपूर्ण: मौजूदा SQLite database अभी device पर encrypted नहीं है। यह सुविधा backup file को encrypt करती है, live database को नहीं। Database-at-rest encryption और App Lock अगले सुरक्षा उपचरण में लागू व जाँचे जाएंगे। वास्तविक संवेदनशील रिकॉर्ड अभी न डालें।',
+      const Text('महत्वपूर्ण: Live database में SQLCipher encryption और App PIN lock का कोड जोड़ा गया है। लेकिन पुराने database migration, Android secure key storage, app lock और backup/restore का वास्तविक मोबाइल पर परीक्षण अभी बाकी है। परीक्षण पूरा होने तक वास्तविक पुलिस/न्यायालय रिकॉर्ड दर्ज न करें।',
         style: TextStyle(color: Colors.redAccent, height: 1.4)),
     ]),
   );

@@ -374,8 +374,13 @@ class _RegisterFormState extends State<_RegisterForm> {
         final value = (v ?? '').trim();
         if (field.required && value.isEmpty) return 'यह विवरण आवश्यक है';
         if (field.key == 'mobile' && value.isNotEmpty) {
-          final normalized = value.replaceAll(RegExp(r'[\\s-]'), '');
-          if (!RegExp(r'^(?:\\+?91)?[6-9]\\d{9}
+          final normalized = value.replaceAll(RegExp(r'[\s-]'), '');
+          if (!RegExp(r'^(?:\+?91)?[6-9]\d{9}$').hasMatch(normalized)) {
+            return '10 अंकों का सही मोबाइल नंबर दर्ज करें';
+          }
+        }
+        return null;
+      },
     ),
   );
 

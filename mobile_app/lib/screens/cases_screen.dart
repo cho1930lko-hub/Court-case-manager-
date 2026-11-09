@@ -358,65 +358,103 @@ class _CaseFormState extends State<_CaseForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).viewInsets.bottom + 16),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: AppTheme.line, borderRadius: BorderRadius.circular(4)))),
-              const SizedBox(height: 16),
-              Text(widget.initial == null ? 'नया मुकदमा जोड़ें' : 'मुकदमा अपडेट करें',
-                style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              const Text('न्यायालयीन रिकॉर्ड का विवरण भरें', style: TextStyle(color: AppTheme.muted, fontSize: 13)),
-              const SizedBox(height: 18),
-              _section('मुकदमे का विवरण', Icons.gavel_rounded, [
-                Row(children: [
-                  Expanded(child: _field('ST NO *', stNo, required: true, icon: Icons.numbers_rounded)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _field('मु0अ0सं0', firNo, icon: Icons.folder_outlined)),
-                ]),
-                _field('धारा', sections, icon: Icons.menu_book_outlined),
-                _field('बनाम / अभियुक्त का नाम *', accused, required: true, icon: Icons.person_outline),
-                _field('न्यायालय', court, icon: Icons.account_balance_outlined),
-              ]),
-              const SizedBox(height: 12),
-              _section('पेशी एवं कार्यवाही', Icons.event_note_rounded, [
-                _field('तलब साक्षी', witnesses, icon: Icons.groups_outlined),
-                _field('अगली तारीख पेशी (DD/MM/YYYY)', nextHearing, icon: Icons.calendar_month_outlined),
-                DropdownButtonFormField<String>(
-                  initialValue: status,
-                  decoration: const InputDecoration(labelText: 'मुकदमे की स्थिति', prefixIcon: Icon(Icons.flag_outlined)),
-                  items: const ['साक्ष्य','हाजिरी','बहस','313 सीआरपीसी','सफाई साक्ष्य','जजमेंट','सजा','दोष मुक्त','अभियुक्त NBW']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                  onChanged: (v) => setState(() => status = v ?? status),
+    final keyboardInset = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, keyboardInset + 12),
+        child: Form(
+          key: _formKey,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .88),
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 680),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(child: Container(width: 38, height: 4,
+                        decoration: BoxDecoration(color: AppTheme.line, borderRadius: BorderRadius.circular(4)))),
+                      const SizedBox(height: 16),
+                      Text(widget.initial == null ? 'नया मुकदमा जोड़ें' : 'मुकदमा अपडेट करें',
+                        style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 4),
+                      const Text('न्यायालयीन रिकॉर्ड का विवरण भरें', style: TextStyle(color: AppTheme.muted, fontSize: 13)),
+                      const SizedBox(height: 18),
+                      _section('मुकदमे का विवरण', Icons.gavel_rounded, [
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final stField = _field('ST NO *', stNo, required: true, icon: Icons.numbers_rounded);
+                            final firField = _field('मु0अ0सं0', firNo, icon: Icons.folder_outlined);
+                            if (constraints.maxWidth < 390) {
+                              return Column(children: [stField, firField]);
+                            }
+                            return Row(children: [
+                              Expanded(child: stField),
+                              const SizedBox(width: 10),
+                              Expanded(child: firField),
+                            ]);
+                          },
+                        ),
+                        _field('धारा', sections, icon: Icons.menu_book_outlined),
+                        _field('बनाम / अभियुक्त का नाम *', accused, required: true, icon: Icons.person_outline),
+                        _field('न्यायालय', court, icon: Icons.account_balance_outlined),
+                      ]),
+                      const SizedBox(height: 12),
+                      _section('पेशी एवं कार्यवाही', Icons.event_note_rounded, [
+                        _field('तलब साक्षी', witnesses, icon: Icons.groups_outlined),
+                        _field('अगली तारीख पेशी (DD/MM/YYYY)', nextHearing, icon: Icons.calendar_month_outlined),
+                        DropdownButtonFormField<String>(
+                          initialValue: status,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'मुकदमे की स्थिति', prefixIcon: Icon(Icons.flag_outlined)),
+                          items: const ['साक्ष्य','हाजिरी','बहस','313 सीआरपीसी','सफाई साक्ष्य','जजमेंट','सजा','दोष मुक्त','अभियुक्त NBW']
+                            .map((v) => DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis))).toList(),
+                          onChanged: (v) => setState(() => status = v ?? status),
+                        ),
+                        const SizedBox(height: 12),
+                        _field('कृत कार्यवाही', action, lines: 3, icon: Icons.edit_note_rounded),
+                      ]),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('रद्द करें'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                if (!_formKey.currentState!.validate()) return;
+                                Navigator.pop(context, {
+                                  'st_no': stNo.text.trim(),
+                                  'fir_no': firNo.text.trim(),
+                                  'sections': sections.text.trim(),
+                                  'accused_name': accused.text.trim(),
+                                  'court_name': court.text.trim(),
+                                  'summoned_witnesses': witnesses.text.trim(),
+                                  'next_hearing': nextHearing.text.trim(),
+                                  'status': status,
+                                  'action_taken': action.text.trim(),
+                                });
+                              },
+                              icon: const Icon(Icons.save_rounded),
+                              label: const Text('रिकॉर्ड सेव करें'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                _field('कृत कार्यवाही', action, lines: 3, icon: Icons.edit_note_rounded),
-              ]),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () {
-                  if (!_formKey.currentState!.validate()) return;
-                  Navigator.pop(context, {
-                    'st_no': stNo.text.trim(),
-                    'fir_no': firNo.text.trim(),
-                    'sections': sections.text.trim(),
-                    'accused_name': accused.text.trim(),
-                    'court_name': court.text.trim(),
-                    'summoned_witnesses': witnesses.text.trim(),
-                    'next_hearing': nextHearing.text.trim(),
-                    'status': status,
-                    'action_taken': action.text.trim(),
-                  });
-                },
-                icon: const Icon(Icons.save_rounded),
-                label: const Text('रिकॉर्ड सेव करें'),
               ),
-            ],
+            ),
           ),
         ),
       ),

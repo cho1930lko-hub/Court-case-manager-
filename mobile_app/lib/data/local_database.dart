@@ -324,6 +324,43 @@ class LocalDatabase {
     }, where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<List<Map<String, Object?>>> caseDocuments(String caseId) async {
+    final db = await database;
+    return db.query('case_documents', where: 'case_id = ?', whereArgs: [caseId],
+      orderBy: 'created_at DESC');
+  }
+
+  Future<void> addCaseDocument({
+    required String id, required String caseId, required String name,
+    required String category, required String path, required String groupId,
+  }) async {
+    final db = await database;
+    await db.insert('case_documents', {
+      'id': id, 'case_id': caseId, 'document_group_id': groupId,
+      'name': name, 'category': category, 'local_path': path,
+      'version': 1, 'remarks': '', 'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> addDocumentVersion({
+    required String id, required String groupId, required String documentId,
+    required int version, required String path, required String remarks,
+  }) async {
+    final db = await database;
+    await db.insert('document_versions', {
+      'id': id, 'document_group_id': groupId, 'document_id': documentId,
+      'version_number': version, 'local_path': path, 'change_remarks': remarks,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> updateDocumentVersion(String id, int version, String path) async {
+    final db = await database;
+    await db.update('case_documents', {
+      'version': version, 'local_path': path, 'remarks': 'नवीनतम संस्करण',
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<List<Map<String, Object?>>> auditEntries({int limit = 300}) async {
     final db = await database;
     return db.query('audit_log', orderBy: 'created_at DESC', limit: limit);

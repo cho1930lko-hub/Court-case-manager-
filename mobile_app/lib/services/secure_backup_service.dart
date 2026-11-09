@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'secure_database_key.dart';
+import 'backup_path_validator.dart';
 
 import '../data/local_database.dart';
 
@@ -142,17 +143,17 @@ class SecureBackupService {
     if (await staging.exists()) await staging.delete(recursive: true);
     await staging.create(recursive: true);
 
-    for (final entry in archive.files) {
-      if (!entry.isFile || !entry.name.startsWith('case_documents/')) continue;
-      final portableName = entry.name.replaceAll(String.fromCharCode(92), '/');
-      final relative = p.normalize(portableName);
-      if (p.isAbsolute(relative) || relative.split('/').contains('..') || relative.startsWith('/')) {
-        throw const FormatException('Backup में असुरक्षित file path मिला।');
+    try {
+      for (final entry in archive.files) {
+        if (!entry.isFile || !entry.name.startsWith('case_documents/')) continue;
+        final safeRelative = safeCaseDocumentRelativePath(entry.name);
+        final out = File(p.join(staging.path, safeRelative));
+        await out.parent.create(recursive: true);
+        await out.writeAsBytes(entry.content as List<int>, flush: true);
       }
-      final out = File(p.join(appDir.path, 'case_documents_restore_tmp',
-          p.relative(relative, from: 'case_documents')));
-      await out.parent.create(recursive: true);
-      await out.writeAsBytes(entry.content as List<int>, flush: true);
+    } catch (_) {
+      if (await staging.exists()) await staging.delete(recursive: true);
+      rethrow;
     }
 
     // Close SQLite before replacing its file; keep a rollback copy until swap completes.

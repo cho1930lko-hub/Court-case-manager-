@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
 import 'screens/register_screen.dart';
@@ -12,11 +13,11 @@ import 'screens/change_pin_screen.dart';
 import 'screens/global_search_screen.dart';
 import 'screens/evidence_screen.dart';
 import 'services/app_lock_service.dart';
+import 'services/secure_backup_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LocalDatabase.instance.database;
   runApp(const CourtCaseManagerApp());
 }
 
@@ -48,6 +49,8 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   bool _configured = false;
   bool _unlocked = false;
   bool _busy = false;
+  bool _recoveryMode = false;
+  String? _startupError;
   bool _showPin = false;
   bool _showConfirm = false;
   String? _error;
@@ -92,6 +95,61 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
     }
   }
 
+
+  Future<void> _openDatabaseAfterPin() async {
+    if (!mounted) return;
+    setState(() { _busy = true; _startupError = null; });
+    try {
+      await LocalDatabase.instance.database;
+      if (mounted) setState(() { _unlocked = true; _recoveryMode = false; });
+    } catch (e) {
+      if (mounted) setState(() {
+        _unlocked = false;
+        _recoveryMode = true;
+        _startupError = 'डेटाबेस सुरक्षित रूप से नहीं खुल पाया। मौजूदा डेटा को न हटाएँ। त्रुटि: $e';
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restoreFromRecovery() async {
+    if (_busy) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['ccmbak'], withData: true,
+      );
+      if (picked == null || picked.files.isEmpty || picked.files.single.bytes == null || !mounted) return;
+      final controller = TextEditingController();
+      final password = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Backup password डालें'),
+          content: TextField(controller: controller, obscureText: true, autofocus: true,
+            decoration: const InputDecoration(labelText: 'Backup password')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('रद्द करें')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('Restore करें')),
+          ],
+        ),
+      );
+      controller.dispose();
+      if (password == null || !mounted) return;
+      setState(() { _busy = true; _startupError = null; });
+      await SecureBackupService.instance.restoreBackup(
+        picked.files.single.bytes!, password, allowUninitializedDatabase: true,
+      );
+      await LocalDatabase.instance.database;
+      if (mounted) setState(() { _recoveryMode = false; _unlocked = true; });
+    } catch (e) {
+      if (mounted) setState(() => _startupError =
+          'Recovery असफल रही। मौजूदा डेटा सुरक्षित रखने का प्रयास किया गया है। त्रुटि: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (_busy) return;
     FocusScope.of(context).unfocus();
@@ -115,15 +173,11 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
           return;
         }
       }
-      if (mounted) {
-        setState(() {
-          _unlocked = true;
-          _pin.clear();
-          _confirm.clear();
-          _showPin = false;
-          _showConfirm = false;
-        });
-      }
+      _pin.clear();
+      _confirm.clear();
+      _showPin = false;
+      _showConfirm = false;
+      await _openDatabaseAfterPin();
     } catch (e) {
       if (mounted) setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
     } finally {
@@ -139,11 +193,53 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    if (_recoveryMode) {
+      return Scaffold(
+        backgroundColor: AppTheme.canvas,
+        appBar: AppBar(title: const Text('डेटाबेस Recovery')),
+        body: SafeArea(child: Center(child: SingleChildScrollView(
+          padding: const EdgeInsets.all(22),
+          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430), child: Card(
+            child: Padding(padding: const EdgeInsets.all(22), child: Column(
+              mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.health_and_safety_outlined, size: 42, color: AppTheme.blue),
+                const SizedBox(height: 14),
+                Text('डेटाबेस नहीं खुल पाया', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 10),
+                const Text('आपका PIN सत्यापित हो चुका है, लेकिन डेटाबेस की जाँच/ओपनिंग में समस्या आई है। अभी नया डेटाबेस न बनाएँ और ऐप का डेटा/फाइलें delete न करें।', style: TextStyle(height: 1.45)),
+                if (_startupError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_startupError!, style: const TextStyle(color: Color(0xFFAC4038), fontSize: 12, height: 1.4)),
+                ],
+                const SizedBox(height: 18),
+                SizedBox(width: double.infinity, child: FilledButton.icon(
+                  onPressed: _busy ? null : _restoreFromRecovery,
+                  icon: const Icon(Icons.restore), label: const Text('Encrypted Backup से Restore'),
+                )),
+                const SizedBox(height: 8),
+                SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                  onPressed: _busy ? null : _openDatabaseAfterPin,
+                  icon: const Icon(Icons.refresh), label: const Text('दोबारा प्रयास करें'),
+                )),
+                if (_busy) const Padding(padding: EdgeInsets.only(top: 14),
+                  child: Center(child: CircularProgressIndicator())),
+                const SizedBox(height: 8),
+                const Text('Restore केवल मान्य .ccmbak backup और उसका सही password मिलने पर होगा। चुना गया backup मौजूदा डेटा को बदलता है।',
+                  style: TextStyle(fontSize: 11, color: AppTheme.muted, height: 1.4)),
+              ],
+            )),
+          )),
+        ))),
+      );
+    }
+
     final setup = !_configured;
     return Stack(
       fit: StackFit.expand,
       children: [
-        widget.child,
+        if (_unlocked) widget.child,
         if (!_unlocked)
           Scaffold(
             backgroundColor: AppTheme.canvas,

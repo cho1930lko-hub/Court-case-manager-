@@ -209,6 +209,45 @@ class LocalDatabase {
     });
   }
 
+  Future<List<Map<String, Object?>>> searchRegister(String table, String query) async {
+    const allowed = {'dak_register', 'remand_register', 'address_book'};
+    if (!allowed.contains(table)) throw ArgumentError('Unsupported register: $table');
+    final db = await database;
+    final q = query.trim();
+    if (q.isEmpty) {
+      return db.query(table, orderBy: 'created_at DESC');
+    }
+    final columns = switch (table) {
+      'dak_register' => ['st_no', 'accused_name', 'dak_type', 'court_name', 'related_station', 'remarks'],
+      'remand_register' => ['fir_no', 'sections', 'court_name', 'investigating_officer', 'accused_details'],
+      _ => ['name', 'mobile', 'department', 'address'],
+    };
+    final where = columns.map((column) => '$column LIKE ?').join(' OR ');
+    return db.query(table, where: where, whereArgs: List.filled(columns.length, '%$q%'),
+        orderBy: 'created_at DESC');
+  }
+
+  Future<void> saveRegister(String table, Map<String, Object?> values,
+      {required String id, required bool isNew}) async {
+    const allowed = {'dak_register', 'remand_register', 'address_book'};
+    if (!allowed.contains(table)) throw ArgumentError('Unsupported register: $table');
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    if (isNew) {
+      await db.insert(table, {
+        ...values,
+        'id': id,
+        'created_at': now,
+        if (table != 'remand_register') 'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.abort);
+    } else {
+      await db.update(table, {
+        ...values,
+        if (table != 'remand_register') 'updated_at': now,
+      }, where: 'id = ?', whereArgs: [id]);
+    }
+  }
+
   Future<String> databasePath() async {
     final root = await getDatabasesPath();
     return p.join(root, 'court_case_manager.db');

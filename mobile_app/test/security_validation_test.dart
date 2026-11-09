@@ -42,9 +42,25 @@ void main() {
   });
 
   group('Backup document path validation', () {
-    test('accepts files under case_documents', () {
+    test('accepts files under both managed attachment roots', () {
       expect(safeCaseDocumentRelativePath('case_documents/case-1/order.pdf'),
           'case-1/order.pdf');
+      expect(safeManagedFileRelativePath('evidence/case-1/seizure-photo.jpg'),
+          'evidence/case-1/seizure-photo.jpg');
+    });
+
+    test('rejects unknown roots, empty segments and traversal in evidence paths', () {
+      for (final path in [
+        'other/case-1/file.pdf',
+        'evidence/../outside.pdf',
+        'evidence/case-1/../../outside.pdf',
+        'evidence//file.pdf',
+        r'evidence\\case-1\\..\\..\\outside.pdf',
+        '/evidence/case-1/file.pdf',
+      ]) {
+        expect(() => safeManagedFileRelativePath(path),
+            throwsA(isA<FormatException>()), reason: path);
+      }
     });
 
     test('rejects parent traversal that normalizes outside the document root', () {

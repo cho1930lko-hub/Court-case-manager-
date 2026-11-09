@@ -21,7 +21,7 @@ class LocalDatabase {
     _db = await openDatabase(
       path,
       password: key,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         await db.execute('PRAGMA journal_mode = WAL');
@@ -29,6 +29,7 @@ class LocalDatabase {
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createGeneratedDocumentsTable(db);
+        if (oldVersion < 3) await _createEvidenceTable(db);
       },
     );
     return _db!;
@@ -222,6 +223,31 @@ class LocalDatabase {
       ('schema_label', 'offline_v1'),
       ('data_owner', 'this_device')
     ''');
+    await _createEvidenceTable(db);
+  }
+
+  Future<void> _createEvidenceTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS evidence_items (
+        id TEXT PRIMARY KEY,
+        case_id TEXT NOT NULL,
+        item_type TEXT NOT NULL DEFAULT 'अन्य',
+        description TEXT NOT NULL,
+        seizure_date TEXT DEFAULT '',
+        seized_from TEXT DEFAULT '',
+        malkhana_entry TEXT DEFAULT '',
+        seal_details TEXT DEFAULT '',
+        exhibit_no TEXT DEFAULT '',
+        produced_in_court INTEGER NOT NULL DEFAULT 0,
+        local_path TEXT DEFAULT '',
+        remarks TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(case_id) REFERENCES cases(id)
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_evidence_case ON evidence_items(case_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_evidence_exhibit ON evidence_items(exhibit_no)');
   }
 
   Future<void> _createGeneratedDocumentsTable(Database db) async {
@@ -262,6 +288,39 @@ class LocalDatabase {
     );
   }
 
+
+  Future<List<Map<String, Object?>>> evidenceItems({String? caseId}) async {
+    final db = await database;
+    if (caseId == null) {
+      return db.rawQuery('''
+        SELECT e.*, c.st_no, c.fir_no, c.accused_name
+        FROM evidence_items e
+        JOIN cases c ON c.id = e.case_id
+        ORDER BY e.updated_at DESC
+      ''');
+    }
+    return db.query('evidence_items', where: 'case_id = ?', whereArgs: [caseId], orderBy: 'updated_at DESC');
+  }
+
+  Future<void> saveEvidence(Map<String, Object?> values, {String? id}) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    if (id == null) {
+      await db.insert('evidence_items', {
+        ...values,
+        'created_at': now,
+        'updated_at': now,
+      });
+    } else {
+      await db.update('evidence_items', {...values, 'updated_at': now},
+          where: 'id = ?', whereArgs: [id]);
+    }
+  }
+
+  Future<void> deleteEvidence(String id) async {
+    final db = await database;
+    await db.delete('evidence_items', where: 'id = ?', whereArgs: [id]);
+  }
 
   /// Searches all primary registers without changing or copying stored records.
   Future<List<Map<String, Object?>>> globalSearch(String query) async {

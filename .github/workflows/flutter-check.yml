@@ -129,8 +129,27 @@ jobs:
           printf '%s\n' '-keep class net.sqlcipher.** { *; }' >> android/app/proguard-rules.pro
       - name: Harden Android project (no auto-backup, FLAG_SECURE)
         run: python3 tool/harden_android.py
-      - name: Build debug APK
-        run: flutter build apk --debug
+      - name: Build debug APK (retry transient dependency downloads)
+        shell: bash
+        run: |
+          set -o pipefail
+          for attempt in 1 2 3; do
+            echo "Android APK build attempt $attempt/3"
+            if flutter build apk --debug; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Build failed; waiting before retrying dependency resolution..."
+              sleep $((attempt * 20))
+            fi
+          done
+          echo "APK build failed after 3 attempts."
+          exit 1
+      - name: Verify debug APK
+        run: |
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$APK"
+          ls -lh "$APK"
       - uses: actions/upload-artifact@v4
         with:
           name: court-case-manager-debug-apk

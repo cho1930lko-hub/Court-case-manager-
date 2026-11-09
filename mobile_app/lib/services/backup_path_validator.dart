@@ -1,7 +1,7 @@
 /// Validates a document entry from a decrypted backup archive.
 /// Returns a safe path relative to the case_documents directory.
 String safeCaseDocumentRelativePath(String archiveName) {
-  final portable = archiveName.replaceAll(r'\\', '/');
+  final portable = archiveName.replaceAll(String.fromCharCode(92), '/');
   if (portable.startsWith('/') ||
       RegExp(r'^[A-Za-z]:').hasMatch(portable) ||
       !portable.startsWith('case_documents/')) {

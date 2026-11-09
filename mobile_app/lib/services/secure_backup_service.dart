@@ -156,48 +156,53 @@ class SecureBackupService {
       rethrow;
     }
 
-    // Close SQLite before replacing its file; keep a rollback copy until swap completes.
-    final currentPath = await LocalDatabase.instance.databasePath();
-    final currentFile = File(currentPath);
-    final rollbackPath = '$currentPath.restore_previous';
-    final liveDocs = Directory(p.join(appDir.path, 'case_documents'));
-    final oldDocs = Directory(p.join(appDir.path, 'case_documents_restore_previous'));
-    final previousDatabaseKey = await SecureDatabaseKey.instance.read();
-    final liveDb = await LocalDatabase.instance.database;
-    final checkpoint = await liveDb.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
-    if (checkpoint.isNotEmpty && (checkpoint.first['busy'] as int? ?? 0) != 0) {
-      throw StateError('Database checkpoint busy है; restore सुरक्षित रूप से शुरू नहीं किया जा सकता।');
-    }
-    if (await currentFile.exists()) await currentFile.copy(rollbackPath);
-    if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
-    if (await liveDocs.exists()) await liveDocs.rename(oldDocs.path);
-    try {
-      await LocalDatabase.instance.closeForRestore();
-      for (final suffix in ['', '-wal', '-shm']) {
-        final old = File('$currentPath$suffix');
-        if (await old.exists()) await old.delete();
+      // The decrypted staging copy must never outlive this restore attempt.
+      try {
+      // Close SQLite before replacing its file; keep a rollback copy until swap completes.
+      final currentPath = await LocalDatabase.instance.databasePath();
+      final currentFile = File(currentPath);
+      final rollbackPath = '$currentPath.restore_previous';
+      final liveDocs = Directory(p.join(appDir.path, 'case_documents'));
+      final oldDocs = Directory(p.join(appDir.path, 'case_documents_restore_previous'));
+      final previousDatabaseKey = await SecureDatabaseKey.instance.read();
+      final liveDb = await LocalDatabase.instance.database;
+      final checkpoint = await liveDb.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+      if (checkpoint.isNotEmpty && (checkpoint.first['busy'] as int? ?? 0) != 0) {
+        throw StateError('Database checkpoint busy है; restore सुरक्षित रूप से शुरू नहीं किया जा सकता।');
       }
-      await File(currentPath).writeAsBytes(dbBytes, flush: true);
-      await SecureDatabaseKey.instance.replace(backupDatabaseKey);
-      if (await staging.exists()) await staging.rename(liveDocs.path);
-      final restoredDb = await LocalDatabase.instance.database;
-      final check = await restoredDb.rawQuery('PRAGMA integrity_check');
-      if (check.isEmpty || check.first.values.first != 'ok') {
-        throw const FormatException('Restored database की अंतिम जाँच असफल हुई।');
-      }
-      if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
+      if (await currentFile.exists()) await currentFile.copy(rollbackPath);
       if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
-    } catch (_) {
-      await LocalDatabase.instance.closeForRestore();
-      for (final suffix in ['', '-wal', '-shm']) {
-        final sidecar = File('$currentPath$suffix');
-        if (await sidecar.exists()) await sidecar.delete();
+      if (await liveDocs.exists()) await liveDocs.rename(oldDocs.path);
+      try {
+        await LocalDatabase.instance.closeForRestore();
+        for (final suffix in ['', '-wal', '-shm']) {
+          final old = File('$currentPath$suffix');
+          if (await old.exists()) await old.delete();
+        }
+        await File(currentPath).writeAsBytes(dbBytes, flush: true);
+        await SecureDatabaseKey.instance.replace(backupDatabaseKey);
+        if (await staging.exists()) await staging.rename(liveDocs.path);
+        final restoredDb = await LocalDatabase.instance.database;
+        final check = await restoredDb.rawQuery('PRAGMA integrity_check');
+        if (check.isEmpty || check.first.values.first != 'ok') {
+          throw const FormatException('Restored database की अंतिम जाँच असफल हुई।');
+        }
+        if (await File(rollbackPath).exists()) await File(rollbackPath).delete();
+        if (await oldDocs.exists()) await oldDocs.delete(recursive: true);
+      } catch (_) {
+        await LocalDatabase.instance.closeForRestore();
+        for (final suffix in ['', '-wal', '-shm']) {
+          final sidecar = File('$currentPath$suffix');
+          if (await sidecar.exists()) await sidecar.delete();
+        }
+        if (await File(rollbackPath).exists()) await File(rollbackPath).copy(currentPath);
+        if (previousDatabaseKey != null) await SecureDatabaseKey.instance.replace(previousDatabaseKey);
+        if (await liveDocs.exists()) await liveDocs.delete(recursive: true);
+        if (await oldDocs.exists()) await oldDocs.rename(liveDocs.path);
+        rethrow;
       }
-      if (await File(rollbackPath).exists()) await File(rollbackPath).copy(currentPath);
-      if (previousDatabaseKey != null) await SecureDatabaseKey.instance.replace(previousDatabaseKey);
-      if (await liveDocs.exists()) await liveDocs.delete(recursive: true);
-      if (await oldDocs.exists()) await oldDocs.rename(liveDocs.path);
-      rethrow;
+    } finally {
+      if (await staging.exists()) await staging.delete(recursive: true);
     }
   }
 

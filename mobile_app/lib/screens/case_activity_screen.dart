@@ -52,7 +52,6 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
       id: const Uuid().v4(), caseId: _caseId!,
       date: form['दिनांक (DD/MM/YYYY)']!, type: form['कार्यवाही का प्रकार']!, description: form['विवरण']!,
     );
-    await LocalDatabase.instance.logAction('TIMELINE_ADDED', 'CASE_TIMELINE', _caseId!, form['कार्यवाही का प्रकार']!);
     await _load();
   }
 
@@ -67,14 +66,11 @@ class _CaseActivityScreenState extends State<CaseActivityScreen> {
       id: const Uuid().v4(), caseId: _caseId!, task: form['कार्य']!,
       dueDate: form['अंतिम तिथि (DD/MM/YYYY)']!, assignedTo: form['जिम्मेदार व्यक्ति']!, remarks: form['टिप्पणी']!,
     );
-    await LocalDatabase.instance.logAction('CHECKLIST_ADDED', 'CASE_CHECKLIST', _caseId!, form['कार्य']!);
     await _load();
   }
 
   Future<void> _toggleTask(Map<String, Object?> task, bool done) async {
     await LocalDatabase.instance.setChecklistStatus(task['id'].toString(), done);
-    await LocalDatabase.instance.logAction(done ? 'TASK_COMPLETED' : 'TASK_REOPENED',
-      'CASE_CHECKLIST', task['id'].toString(), task['task_name'].toString());
     await _load();
   }
 

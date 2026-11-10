@@ -35,12 +35,12 @@ jobs:
       - name: Run Android SQLCipher v4 to v5 migration test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 34
           target: google_apis
-          arch: x86
+          arch: x86_64
           profile: pixel_2
           disable-animations: false
-          emulator-boot-timeout: 600
+          emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics -memory 2048 -cores 2
           working-directory: mobile_app
-          script: flutter test integration_test/sqlcipher_migration_test.dart -d emulator-5554
+          script: flutter devices --device-timeout 120 && flutter test integration_test/sqlcipher_migration_test.dart -d emulator-5554

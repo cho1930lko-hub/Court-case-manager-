@@ -104,3 +104,17 @@ The live SQLite database uses SQLCipher and its key is stored in Android secure 
 ## Migration policy
 
 The original Streamlit app and its source files remain untouched. Legacy Google Sheets data will only be imported after an explicit export/selection and a row-count/reconciliation check. No existing source records will be deleted.
+
+
+## Phase 8 — Download and install a test APK
+
+The `phase8-data-migration` branch now has an Android Debug APK workflow. It generates the Android platform scaffold in the CI runner, applies the Android backup hardening and SQLCipher keep rule, runs Flutter tests/analyzer, and builds a debug APK.
+
+1. Open the repository's **Actions** tab.
+2. Select **Android Debug APK** and open the latest successful run for `phase8-data-migration`.
+3. Under **Artifacts**, download `court-case-manager-debug-apk`.
+4. Extract the ZIP; it contains `app-debug.apk`.
+5. Transfer the APK to the Android phone and install it. If Android asks, allow installation from that file manager/browser for this one install.
+6. Open the app and test with dummy records first. Do not import live court/police records until the SQLCipher, backup/restore and reconciliation gates are approved.
+
+This is a debug/test APK, not a signed production release. Android platform files are generated in CI and are not committed into the source branch. The APK artifact is retained for 14 days per workflow settings.

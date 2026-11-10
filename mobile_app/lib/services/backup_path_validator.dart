@@ -6,7 +6,7 @@ String safeManagedFileRelativePath(String archiveName) {
     throw const FormatException('Backup में असुरक्षित file path मिला।');
   }
   final segments = portable.split('/');
-  const roots = {'case_documents', 'evidence'};
+  const roots = {'case_documents', 'evidence', 'dak_attachments'};
   if (segments.length < 3 || !roots.contains(segments.first) ||
       segments.any((part) => part.isEmpty || part == '.' || part == '..')) {
     throw const FormatException('Backup में असुरक्षित file path मिला।');

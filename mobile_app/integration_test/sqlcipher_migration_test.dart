@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
@@ -134,6 +136,12 @@ void main() {
       );
       expect(await legacy.rawQuery('PRAGMA integrity_check'), isNotEmpty);
       await legacy.close();
+
+      final encryptedFile = File(path);
+      final fileHandle = await encryptedFile.open();
+      final encryptedHeader = await fileHandle.read(16);
+      await fileHandle.close();
+      expect(String.fromCharCodes(encryptedHeader), isNot(startsWith('SQLite format 3')));
 
       final localDatabase = LocalDatabase.forTesting(
         await openDatabase(

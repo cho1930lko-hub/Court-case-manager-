@@ -232,8 +232,10 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   Future<void> _import() async {
     final unmapped = <String>[
       for (var i = 0; i < _headers.length; i++)
-        if (_headers[i].trim().isNotEmpty && _mapping[i] == null)
-          _headers[i],
+        if (_mapping[i] == null &&
+            (_headers[i].trim().isNotEmpty ||
+             _sourceRows.any((row) => i < row.length && row[i].trim().isNotEmpty)))
+          (_headers[i].trim().isEmpty ? 'खाली हेडर (कॉलम ${i + 1})' : _headers[i]),
     ];
     if (unmapped.isNotEmpty) {
       _message('पहले इन कॉलम का मिलान करें या उन्हें स्पष्ट रूप से छोड़ने का निर्णय लें: ${unmapped.join(', ')}');
@@ -241,7 +243,10 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     }
     final allRows = _preview;
     final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_invalidRows.containsKey(i)) allRows[i]];
-    if (rows.isEmpty) { _message('Import के लिए कोई वैध रिकॉर्ड चयनित नहीं है।'); return; }
+    if (rows.isEmpty && _invalidRows.isEmpty) {
+      _message('Import या समीक्षा रिपोर्ट के लिए कोई पंक्ति चयनित नहीं है।');
+      return;
+    }
     setState(() => _busy = true);
     try {
       final selectedSourceRows = [
@@ -249,9 +254,18 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
           if (_selectedRows.contains(i) && !_invalidRows.containsKey(i))
             _sourceRowNumbers[i],
       ];
+      final rejectedRows = [
+        for (final entry in _invalidRows.entries)
+          <String, Object?>{
+            'source_row': _sourceRowNumbers[entry.key],
+            'reason': entry.value,
+            'row_data': allRows[entry.key],
+          },
+      ];
       final result = await LocalDatabase.instance.importRegisterRows(
         _module, rows, sourceName: '$_sourceName / ${_selectedSheet ?? ''}',
         sourceRowNumbers: selectedSourceRows,
+        preRejectedRows: rejectedRows,
       );
       final rowErrors = await LocalDatabase.instance.latestImportRowErrors(
         _module, '$_sourceName / ${_selectedSheet ?? ''}');
@@ -396,8 +410,12 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
         }),
         if (_sourceRows.length > 30) const Text('पहली 30 पंक्तियाँ दिखाई गई हैं; अन्य वैध पंक्तियाँ भी चयनित हैं।'),
         const SizedBox(height: 12),
-        FilledButton.icon(onPressed: _busy || _selectedRows.isEmpty ? null : _import,
-          icon: const Icon(Icons.playlist_add_check), label: Text(_busy ? 'प्रक्रिया जारी…' : '${_selectedRows.length} चयनित रिकॉर्ड Import करें')),
+        FilledButton.icon(
+          onPressed: _busy || (_selectedRows.isEmpty && _invalidRows.isEmpty) ? null : _import,
+          icon: const Icon(Icons.playlist_add_check),
+          label: Text(_busy ? 'प्रक्रिया जारी…' :
+            '${_selectedRows.length} रिकॉर्ड Import + ${_invalidRows.length} समीक्षा में भेजें'),
+        ),
       ],
       if (_result != null) ...[
         const SizedBox(height: 14),

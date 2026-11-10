@@ -174,3 +174,23 @@ Create and run synthetic XLSX tests for all four registers, then run Flutter ana
 2. Verify SQLCipher upgrade from the actual v4 database shape, including both legacy dynamic-field table variants.
 3. Test duplicate, incomplete-key, invalid-date, custom-field, blank-header, and multi-column collision cases on Android.
 4. Reconcile all source rows against imported + duplicate/skipped + invalid/error totals before authorizing real migration.
+
+
+### Additional synthetic rule simulation — 2026-11-10
+
+A local in-memory SQLite simulation exercised the four register identity rules with synthetic rows:
+
+| Register | Scenario | Simulated result |
+|---|---|---|
+| Session Court | ST NO `0012` | Imported; leading zero preserved |
+| Session Court | Same ST NO again | Duplicate |
+| Session Court | Blank ST NO | Manual review |
+| Dak | Same STN + same Type | Duplicate |
+| Dak | Same STN + different Type | Manual review |
+| Dak | Missing Type | Manual review |
+| Rimand | Same FIR + remand date | Duplicate |
+| Rimand | Missing remand date | Manual review |
+| Address Book | Same mobile + different name | Manual review |
+| Address Book | Missing mobile | Manual review |
+
+The simulation stored 9 exception rows. This verifies the intended SQL/rule behavior in an isolated SQLite model only; it does not execute the Dart importer, sqflite_sqlcipher, or Android code.

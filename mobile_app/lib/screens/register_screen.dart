@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -146,7 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         SnackBar(content: Text(row == null ? 'रिकॉर्ड सेव हो गया।' : 'रिकॉर्ड अपडेट हो गया।')));
     } catch (e) {
       if (committedAttachment != null) {
-        final file = File(committedAttachment!);
+        final file = File(committedAttachment);
         if (await file.exists()) await file.delete();
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('सेव नहीं हुआ: ' + e.toString())));
@@ -296,6 +297,7 @@ class _RegisterFormState extends State<_RegisterForm> {
   final Map<String, List<Map<String, Object?>>> _customOptions = {};
   String _dakAttachmentPath = '';
   String? _stagedDakAttachment;
+  bool _handedOffStagedAttachment = false;
 
   @override
   void initState() {
@@ -326,7 +328,14 @@ class _RegisterFormState extends State<_RegisterForm> {
   }
 
   @override
-  void dispose() { for (final c in _controllers.values) { c.dispose(); } for (final c in _customControllers.values) { c.dispose(); } super.dispose(); }
+  void dispose() {
+    if (!_handedOffStagedAttachment) {
+      unawaited(DakAttachmentService.instance.discard(_stagedDakAttachment));
+    }
+    for (final c in _controllers.values) { c.dispose(); }
+    for (final c in _customControllers.values) { c.dispose(); }
+    super.dispose();
+  }
 
   IconData _fieldIcon(String key) {
     switch (key) {
@@ -391,7 +400,11 @@ class _RegisterFormState extends State<_RegisterForm> {
   Future<void> _pickDakAttachment() async {
     try {
       final staged = await DakAttachmentService.instance.pickAndStage();
-      if (staged == null || !mounted) return;
+      if (staged == null) return;
+      if (!mounted) {
+        await DakAttachmentService.instance.discard(staged);
+        return;
+      }
       await DakAttachmentService.instance.discard(_stagedDakAttachment);
       setState(() => _stagedDakAttachment = staged);
     } catch (e) {
@@ -632,6 +645,7 @@ class _RegisterFormState extends State<_RegisterForm> {
                             child: FilledButton.icon(
                               onPressed: () {
                                 if (!_formKey.currentState!.validate()) return;
+                                _handedOffStagedAttachment = true;
                                 Navigator.pop(context, {
                                   for (final e in _controllers.entries) e.key: e.value.text.trim(),
                                   if (widget.config.table == 'dak_register') 'attachment_path': _dakAttachmentPath,

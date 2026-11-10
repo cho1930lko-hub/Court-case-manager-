@@ -612,6 +612,26 @@ class LocalDatabase {
         try {
           final id = (values.remove('id') ??
               '${DateTime.now().microsecondsSinceEpoch}-$index').toString();
+
+          final hasStNo = (values['st_no']?.toString().trim().isNotEmpty ?? false);
+          final hasFir = (values['fir_no']?.toString().trim().isNotEmpty ?? false);
+          final hasRemandDate = (values['remand_date']?.toString().trim().isNotEmpty ?? false);
+          final hasDakType = (values['dak_type']?.toString().trim().isNotEmpty ?? false);
+          final hasMobile = (values['mobile']?.toString().trim().isNotEmpty ?? false);
+          final keyComplete = switch (table) {
+            'cases' => hasStNo,
+            'dak_register' => hasStNo && hasDakType,
+            'remand_register' => hasFir && hasRemandDate,
+            'address_book' => hasMobile,
+            _ => false,
+          };
+          if (!keyComplete) {
+            skipped++;
+            await recordIssue(index, 'needs_review',
+              'डुप्लीकेट जाँच की पहचान कुंजी अधूरी है; मैनुअल समीक्षा आवश्यक', source);
+            continue;
+          }
+
           final duplicate = switch (table) {
             'cases' => (values['st_no']?.toString().trim().isNotEmpty ?? false)
               ? await txn.query(table, columns: ['id'], where: 'st_no = ?',
@@ -629,16 +649,18 @@ class LocalDatabase {
                   whereArgs: [values['fir_no'].toString(), values['remand_date'].toString()],
                   limit: 1)
               : <Map<String, Object?>>[],
-            _ => (values['st_no']?.toString().trim().isNotEmpty ?? false)
-              ? await txn.query(table, columns: ['id'],
-                  where: 'st_no = ? AND dak_type = ?',
-                  whereArgs: [values['st_no'].toString(), values['dak_type']?.toString() ?? ''],
-                  limit: 1)
-              : <Map<String, Object?>>[],
+            _ => await txn.query(table, columns: ['id', 'dak_type'],
+              where: 'st_no = ?', whereArgs: [values['st_no'].toString()], limit: 10),
           };
           if (duplicate.isNotEmpty) {
+            final isDakPossibleMatch = table == 'dak_register' &&
+              duplicate.every((row) => (row['dak_type'] ?? '').toString().trim().toLowerCase() !=
+                values['dak_type'].toString().trim().toLowerCase());
             skipped++;
-            await recordIssue(index, 'duplicate', 'पहचान कुंजी से मिलता-जुलता रिकॉर्ड पहले से मौजूद है', source);
+            await recordIssue(index, isDakPossibleMatch ? 'needs_review' : 'duplicate',
+              isDakPossibleMatch
+                ? 'समान STN पर अलग Type वाला रिकॉर्ड मिला; मैनुअल समीक्षा आवश्यक'
+                : 'पहचान कुंजी से मिलता-जुलता रिकॉर्ड पहले से मौजूद है', source);
             continue;
           }
 

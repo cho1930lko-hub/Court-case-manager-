@@ -236,7 +236,7 @@ class LocalDatabase {
     await _createEvidenceTable(db);
     await _createDynamicFieldTables(db);
     await _createDynamicDataTables(db);
-    await _ensurePhase8MigrationSchema(db);
+    await ensurePhase8MigrationSchema(db);
   }
 
   Future<void> _createDynamicDataTables(Database db) async {

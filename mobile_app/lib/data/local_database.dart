@@ -9,6 +9,10 @@ import '../services/secure_database_key.dart';
 /// Schema is additive: future upgrades must use versioned migrations.
 class LocalDatabase {
   LocalDatabase._();
+
+  /// Injects an already-open sqflite-compatible database for deterministic tests.
+  LocalDatabase.forTesting(Database database) : _db = database;
+
   static final LocalDatabase instance = LocalDatabase._();
 
   Database? _db;

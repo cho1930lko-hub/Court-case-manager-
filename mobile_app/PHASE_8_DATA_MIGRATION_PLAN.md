@@ -147,3 +147,30 @@ Next implementation steps:
 
 Create and run synthetic XLSX tests for all four registers, then run Flutter analyzer/tests/build and Android device verification before any real migration. Review all `needs_review` and `error` rows before approving an import.
 
+
+
+## Implementation progress — preview rejection and source traceability hardening
+
+### Implemented on `phase8-data-migration`
+
+- Preview-invalid rows are now passed to the database import service as pre-rejected rows. They are persisted in `import_row_errors` with outcome `invalid`, the original worksheet row number, and the validation reason instead of disappearing from the report.
+- If every row is invalid, the user can still run the review-only import so the exception report is saved.
+- Review records now retain both the mapped values and original Excel header/value pairs. Duplicate/error rows also carry the original source row snapshot.
+- A populated column with a blank header now blocks import until it is explicitly mapped or ignored.
+- Multiple Excel columns mapped to the same app field now block import, preventing one source value from silently overwriting another in the preview map.
+- Calendar dates are checked before import. Supported unambiguous formats are day/month/year (or day-month-year / day.month.year) and ISO year-month-day. Impossible dates and unrecognized date text are held for manual review. Blank optional dates remain allowed.
+- Blank `कुल गवाह` is allowed; non-empty non-numeric values are held for review.
+
+### Validation status
+
+- Reviewed the updated importer and database service source on GitHub. The importer file was restored to a single clean copy after an intermediate edit issue; the current committed file is 508 lines and contains one import screen implementation.
+- Ran a local SQLite insert simulation for both `invalid` and `duplicate` exception rows; both were retained with their source row and JSON payload.
+- This is a logic/schema simulation only. Flutter analyzer, Flutter tests, SQLCipher integration tests, APK build, and Android device testing remain pending because the Flutter/Dart SDK and Android device are unavailable here.
+- No production records were imported and no Google Sheet or `main` branch was changed.
+
+### Remaining Phase 8 gates
+
+1. Add executable Flutter tests for the four-register import service and synthetic XLSX workbooks.
+2. Verify SQLCipher upgrade from the actual v4 database shape, including both legacy dynamic-field table variants.
+3. Test duplicate, incomplete-key, invalid-date, custom-field, blank-header, and multi-column collision cases on Android.
+4. Reconcile all source rows against imported + duplicate/skipped + invalid/error totals before authorizing real migration.

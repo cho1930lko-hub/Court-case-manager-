@@ -48,8 +48,8 @@ class ImportValidation {
   static bool isValidDateValue(String column, String value) {
     final raw = value.trim();
     if (!dateColumns.contains(column) || raw.isEmpty) return true;
-    final indian = RegExp(r'^(\\d{1,2})[./-](\\d{1,2})[./-](\\d{4})$').firstMatch(raw);
-    final iso = RegExp(r'^(\\d{4})-(\\d{1,2})-(\\d{1,2})$').firstMatch(raw);
+    final indian = RegExp(r'^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$').firstMatch(raw);
+    final iso = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(raw);
     if (indian == null && iso == null) return false;
     final year = int.parse(indian != null ? indian.group(3)! : iso!.group(1)!);
     final month = int.parse(indian != null ? indian.group(2)! : iso!.group(2)!);

@@ -194,3 +194,40 @@ A local in-memory SQLite simulation exercised the four register identity rules w
 | Address Book | Missing mobile | Manual review |
 
 The simulation stored 9 exception rows. This verifies the intended SQL/rule behavior in an isolated SQLite model only; it does not execute the Dart importer, sqflite_sqlcipher, or Android code.
+
+
+## Implementation progress — executable Phase 8 import tests
+
+### Added to `phase8-data-migration`
+
+- Extracted pure import rules into `lib/services/import_validation.dart`, now used by the actual Import screen:
+  - Excel source-row parsing while retaining original worksheet row numbers
+  - Hindi/English header normalization
+  - Four-register required identity validation
+  - Identity-key construction that refuses incomplete keys
+  - Indian and ISO calendar-date validation
+  - Optional witness count handling
+- Added `test/import_validation_test.dart` with tests for:
+  - Session Court ST NO and leading-zero preservation
+  - Dak STN + Type completeness
+  - Rimand FIR + remand-date completeness
+  - Address Book mobile + name requirements
+  - Leap-year, impossible-date, ISO-date and blank-date cases
+  - Blank/non-numeric witness count
+  - Header normalization
+  - Blank source rows and original Excel row-number retention
+  - Synthetic multi-sheet XLSX encode/decode and selected-sheet parsing
+- Added `.github/workflows/flutter-import-tests.yml` to run the import test file and `flutter analyze` on pushes/PRs to this Phase 8 branch.
+
+### Test execution status
+
+- The tests are committed but have **not yet been executed locally** because this environment has neither Flutter nor Dart installed.
+- The new GitHub Actions workflow is intended to execute them on GitHub. Its result must be checked before treating any test as passed.
+- These are pure validation/parser and synthetic XLSX tests. They do not yet open SQLCipher, call the sqflite database import transaction, or prove Android backup/restore behavior.
+- No real register data was imported; `main` and Google Sheets remain unchanged.
+
+### Next implementation gate
+
+1. Review the first GitHub Actions result and fix any compile/test/analyzer failures.
+2. Add database-level tests for duplicate detection, row-error persistence, and no-overwrite guarantees using a test database adapter.
+3. Add SQLCipher schema-upgrade tests from the actual v4 database layouts before approving any live-data import.

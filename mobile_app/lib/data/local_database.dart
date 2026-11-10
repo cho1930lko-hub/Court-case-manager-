@@ -34,15 +34,19 @@ class LocalDatabase {
         await db.rawQuery('PRAGMA journal_mode = WAL');
       },
       onCreate: _createSchema,
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) await _createGeneratedDocumentsTable(db);
-        if (oldVersion < 3) await _createEvidenceTable(db);
-        if (oldVersion < 4) await _createDynamicFieldTables(db);
-        if (oldVersion < 4) await _createDynamicDataTables(db);
-        if (oldVersion < 5) await ensurePhase8MigrationSchema(db);
-      },
+      onUpgrade: migrateSchema,
     );
     return _db!;
+  }
+
+  /// Shared upgrade dispatcher used by sqflite and migration tests.
+  /// Keep every version step additive so existing records remain intact.
+  Future<void> migrateSchema(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) await _createGeneratedDocumentsTable(db);
+    if (oldVersion < 3) await _createEvidenceTable(db);
+    if (oldVersion < 4) await _createDynamicFieldTables(db);
+    if (oldVersion < 4) await _createDynamicDataTables(db);
+    if (oldVersion < 5) await ensurePhase8MigrationSchema(db);
   }
 
   Future<void> _migratePlainDatabaseIfNeeded(String path, String key) async {

@@ -69,6 +69,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   String? _selectedSheet;
   bool _busy = false;
   Map<String, int>? _result;
+  List<Map<String, Object?>> _importErrors = [];
   Set<int> _duplicateRows = {};
   Map<int, String> _invalidRows = {};
   Set<int> _selectedRows = {};
@@ -243,9 +244,19 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     if (rows.isEmpty) { _message('Import के लिए कोई वैध रिकॉर्ड चयनित नहीं है।'); return; }
     setState(() => _busy = true);
     try {
-      final result = await LocalDatabase.instance.importRegisterRows(_module, rows, sourceName: _sourceName);
+      final selectedSourceRows = [
+        for (var i = 0; i < _sourceRows.length; i++)
+          if (_selectedRows.contains(i) && !_duplicateRows.contains(i) && !_invalidRows.containsKey(i))
+            _sourceRowNumbers[i],
+      ];
+      final result = await LocalDatabase.instance.importRegisterRows(
+        _module, rows, sourceName: '$_sourceName / ${_selectedSheet ?? ''}',
+        sourceRowNumbers: selectedSourceRows,
+      );
+      final rowErrors = await LocalDatabase.instance.latestImportRowErrors(
+        _module, '$_sourceName / ${_selectedSheet ?? ''}');
       if (!mounted) return;
-      setState(() => _result = result);
+      setState(() { _result = result; _importErrors = rowErrors; });
       _message('Import पूरा हुआ।');
     } catch (e) { _message('Import विफल: $e'); }
     finally { if (mounted) setState(() => _busy = false); }
@@ -363,6 +374,20 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
           Text('सफल: ${_result!['imported']}'),
           Text('Duplicate / खाली छोड़े: ${_result!['skipped']}'),
           Text('त्रुटियाँ: ${_result!['errors']}'),
+          Text('मैनुअल समीक्षा / Duplicate / छोड़े गए: ${_importErrors.length}'),
+          if (_importErrors.isNotEmpty) ...[
+            const Divider(),
+            const Text('पंक्ति-वार समीक्षा रिपोर्ट', style: TextStyle(fontWeight: FontWeight.w700)),
+            ..._importErrors.take(50).map((issue) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Excel पंक्ति ${issue['source_row']} • ${issue['outcome']}\n${issue['reason']}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            )),
+            if (_importErrors.length > 50)
+              Text('अन्य ${_importErrors.length - 50} मुद्दे भी रिपोर्ट में सुरक्षित हैं।'),
+          ],
         ]))),
       ],
       const SizedBox(height: 20),

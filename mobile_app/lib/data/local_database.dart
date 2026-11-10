@@ -651,10 +651,8 @@ class LocalDatabase {
               ? await txn.query(table, columns: ['id'], where: 'st_no = ?',
                   whereArgs: [values['st_no'].toString()], limit: 1)
               : <Map<String, Object?>>[],
-            'address_book' => (values['mobile']?.toString().trim().isNotEmpty ?? false)
-              ? await txn.query(table, columns: ['id'], where: 'mobile = ?',
-                  whereArgs: [values['mobile'].toString()], limit: 1)
-              : <Map<String, Object?>>[],
+            'address_book' => await txn.query(table, columns: ['id', 'name'],
+              where: 'mobile = ?', whereArgs: [values['mobile'].toString()], limit: 10),
             'remand_register' =>
               (values['fir_no']?.toString().trim().isNotEmpty ?? false) &&
               (values['remand_date']?.toString().trim().isNotEmpty ?? false)
@@ -670,11 +668,17 @@ class LocalDatabase {
             final isDakPossibleMatch = table == 'dak_register' &&
               duplicate.every((row) => (row['dak_type'] ?? '').toString().trim().toLowerCase() !=
                 values['dak_type'].toString().trim().toLowerCase());
+            final isSharedMobile = table == 'address_book' &&
+              duplicate.any((row) => (row['name'] ?? '').toString().trim().toLowerCase() !=
+                values['name'].toString().trim().toLowerCase());
+            final needsReview = isDakPossibleMatch || isSharedMobile;
             skipped++;
-            await recordIssue(index, isDakPossibleMatch ? 'needs_review' : 'duplicate',
+            await recordIssue(index, needsReview ? 'needs_review' : 'duplicate',
               isDakPossibleMatch
                 ? 'समान STN पर अलग Type वाला रिकॉर्ड मिला; मैनुअल समीक्षा आवश्यक'
-                : 'पहचान कुंजी से मिलता-जुलता रिकॉर्ड पहले से मौजूद है', source);
+                : isSharedMobile
+                  ? 'समान मोबाइल नंबर अलग नाम से मिला; साझा नंबर की मैनुअल समीक्षा आवश्यक'
+                  : 'पहचान कुंजी से मिलता-जुलता रिकॉर्ड पहले से मौजूद है', source);
             continue;
           }
 

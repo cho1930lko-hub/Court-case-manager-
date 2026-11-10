@@ -61,24 +61,21 @@ class ImportValidation {
 
   static String? validateRow(String module, Map<String, Object?> row) {
     String value(String field) => (row[field] ?? '').toString().trim();
-    switch (module) {
-      case 'cases':
-        if (value('st_no').isEmpty) return 'ST No. आवश्यक है';
-      case 'dak_register':
-        if (value('st_no').isEmpty || value('dak_type').isEmpty) {
-          return 'Dak के लिए STN और Type दोनों आवश्यक हैं';
-        }
-      case 'remand_register':
-        if (value('fir_no').isEmpty || value('remand_date').isEmpty) {
-          return 'रिमांड के लिए FIR नंबर और रिमांड दिनांक दोनों आवश्यक हैं';
-        }
-      case 'address_book':
-        if (value('mobile').isEmpty) return 'मोबाइल नंबर आवश्यक है';
-        if (value('name').isEmpty) return 'नाम आवश्यक है';
-      default:
-        if (!{'cases', 'dak_register', 'remand_register', 'address_book'}.contains(module)) {
-          return 'अज्ञात मॉड्यूल';
-        }
+    if (module == 'cases') {
+      if (value('st_no').isEmpty) return 'ST No. आवश्यक है';
+    } else if (module == 'dak_register') {
+      if (value('st_no').isEmpty || value('dak_type').isEmpty) {
+        return 'Dak के लिए STN और Type दोनों आवश्यक हैं';
+      }
+    } else if (module == 'remand_register') {
+      if (value('fir_no').isEmpty || value('remand_date').isEmpty) {
+        return 'रिमांड के लिए FIR नंबर और रिमांड दिनांक दोनों आवश्यक हैं';
+      }
+    } else if (module == 'address_book') {
+      if (value('mobile').isEmpty) return 'मोबाइल नंबर आवश्यक है';
+      if (value('name').isEmpty) return 'नाम आवश्यक है';
+    } else {
+      return 'अज्ञात मॉड्यूल';
     }
     if (value('total_witnesses').isNotEmpty &&
         int.tryParse(value('total_witnesses')) == null) {

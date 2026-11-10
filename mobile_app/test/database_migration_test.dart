@@ -122,7 +122,7 @@ void main() {
       'created_at': '2025-01-03',
     });
 
-    await localDatabase.ensurePhase8MigrationSchema(db);
+    await localDatabase.migrateSchema(db, 4, 5);
 
     final definition = (await db.query('field_definitions')).single;
     expect(definition['label'], 'Court Reference');
@@ -160,7 +160,7 @@ void main() {
       'details': 'legacy import details',
     });
 
-    await localDatabase.ensurePhase8MigrationSchema(db);
+    await localDatabase.migrateSchema(db, 4, 5);
 
     final history = (await db.query('import_history')).single;
     expect(history['file_name'], 'legacy.xlsx');
@@ -177,8 +177,8 @@ void main() {
       historyUsesSourceName: true,
     );
 
-    await localDatabase.ensurePhase8MigrationSchema(db);
-    await localDatabase.ensurePhase8MigrationSchema(db);
+    await localDatabase.migrateSchema(db, 4, 5);
+    await localDatabase.migrateSchema(db, 4, 5);
 
     final columns = await db.rawQuery('PRAGMA table_info(import_history)');
     expect(columns.map((row) => row['name']), containsAll([

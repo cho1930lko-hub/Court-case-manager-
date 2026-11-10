@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../data/local_database.dart';
+import '../services/import_validation.dart';
 import '../theme/app_theme.dart';
 
 class ImportExportScreen extends StatefulWidget {
@@ -88,7 +89,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     setState(() { _columns = cols; _columnLabels = labels; _headers = []; _sourceRows = []; _mapping = {}; _result = null; });
   }
 
-  String _norm(String value) => value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9ऀ-ॿ]+'), '').trim();
+  String _norm(String value) => ImportValidation.normalizeHeader(value);
 
   Future<void> _pickFile() async {
     final picked = await FilePicker.platform.pickFiles(
@@ -121,19 +122,16 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     final rows = sheet.rows
         .map((r) => r.map((c) => c?.value?.toString() ?? '').toList())
         .toList();
-    if (rows.length < 2) {
-      _message('चुनी गई शीट में हेडर और कम-से-कम एक डेटा पंक्ति होनी चाहिए।');
+    late final ParsedImportSheet parsed;
+    try {
+      parsed = ImportValidation.parseRows(rows);
+    } catch (e) {
+      _message(e.toString());
       return;
     }
-    final headers = rows.first;
-    final data = <List<String>>[];
-    final sourceRowNumbers = <int>[];
-    for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
-      final row = rows[rowIndex];
-      if (!row.any((v) => v.trim().isNotEmpty)) continue;
-      data.add(List.generate(headers.length, (i) => i < row.length ? row[i] : ''));
-      sourceRowNumbers.add(rowIndex + 1);
-    }
+    final headers = parsed.headers;
+    final data = parsed.rows;
+    final sourceRowNumbers = parsed.sourceRowNumbers;
     final map = <int, String?>{};
     for (var i = 0; i < headers.length; i++) {
       final h = _norm(headers[i]);
@@ -161,24 +159,6 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     await _analyseRows();
   }
 
-  bool _isValidDateValue(String column, String value) {
-    const dateColumns = {
-      'next_hearing', 'previous_hearing', 'fir_date', 'charge_sheet_date',
-      'cognizance_date', 'charge_framed_date', 'station_received_date',
-      'hearing_date', 'remand_date', 'first_remand_date',
-    };
-    final raw = value.trim();
-    if (!dateColumns.contains(column) || raw.isEmpty) return true;
-    final indian = RegExp(r'^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$').firstMatch(raw);
-    final iso = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(raw);
-    if (indian == null && iso == null) return false;
-    final year = int.parse(indian != null ? indian.group(3)! : iso!.group(1)!);
-    final month = int.parse(indian != null ? indian.group(2)! : iso!.group(2)!);
-    final day = int.parse(indian != null ? indian.group(1)! : iso!.group(3)!);
-    if (year < 1900 || month < 1 || month > 12 || day < 1) return false;
-    final parsed = DateTime(year, month, day);
-    return parsed.year == year && parsed.month == month && parsed.day == day;
-  }
   String _convertValue(String column, String value) {
     final v = value.trim();
     if (v.isEmpty) return '';
@@ -205,16 +185,8 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
 
   Future<void> _analyseRows() async {
     final current = await LocalDatabase.instance.exportRegisterRows(_module);
-    String key(Map<String, Object?> row) {
-      final fields = switch (_module) {
-        'cases' => ['st_no'],
-        'dak_register' => ['st_no', 'dak_type'],
-        'remand_register' => ['fir_no', 'remand_date'],
-        _ => ['mobile', 'name'],
-      };
-      final values = fields.map((f) => (row[f] ?? '').toString().trim().toLowerCase()).toList();
-      return values.every((v) => v.isEmpty) ? '' : values.join('|');
-    }
+    String key(Map<String, Object?> row) =>
+        ImportValidation.identityKey(_module, row);
     final existing = current.map(key).where((v) => v.isNotEmpty).toSet();
     final seen = <String>{};
     final duplicates = <int>{};
@@ -225,23 +197,8 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       final identity = key(row);
       if (identity.isEmpty) invalid[i] = 'मुख्य पहचान वाला कॉलम खाली है';
       else if (existing.contains(identity) || !seen.add(identity)) duplicates.add(i);
-      if (_module == 'cases' && (row['st_no'] ?? '').toString().trim().isEmpty) {
-        invalid[i] = 'ST No. आवश्यक है';
-      }
-      if (_module == 'address_book' && (row['name'] ?? '').toString().trim().isEmpty) {
-        invalid[i] = 'नाम आवश्यक है';
-      }
-      if (row.containsKey('total_witnesses') &&
-          row['total_witnesses'].toString().trim().isNotEmpty &&
-          int.tryParse(row['total_witnesses'].toString()) == null) {
-        invalid[i] = 'कुल गवाह संख्या गलत है';
-      }
-      for (final entry in row.entries) {
-        if (!_isValidDateValue(entry.key, (entry.value ?? '').toString())) {
-          invalid[i] = '${entry.key}: तारीख खाली/अमान्य प्रारूप में है; मूल Excel पंक्ति की जाँच करें';
-          break;
-        }
-      }
+      final validationError = ImportValidation.validateRow(_module, row);
+      if (validationError != null) invalid[i] = validationError;
     }
     if (!mounted) return;
     setState(() {

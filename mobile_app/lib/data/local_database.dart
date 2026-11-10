@@ -573,6 +573,7 @@ class LocalDatabase {
       List<Map<String, Object?>> rows, {
         required String sourceName,
         List<int>? sourceRowNumbers,
+        List<Map<String, Object?>> preRejectedRows = const [],
       }) async {
     const allowed = {'cases', 'dak_register', 'remand_register', 'address_book'};
     if (!allowed.contains(table)) throw ArgumentError('Unsupported import table');
@@ -586,9 +587,8 @@ class LocalDatabase {
     var imported = 0, skipped = 0, errors = 0;
 
     await db.transaction((txn) async {
-      Future<void> recordIssue(int index, String outcome, String reason,
+      Future<void> recordIssueAt(int sourceRow, String outcome, String reason,
           Map<String, Object?> source) async {
-        final sourceRow = sourceRowNumbers == null ? index + 2 : sourceRowNumbers[index];
         await txn.insert('import_row_errors', {
           'id': '${importId}_$sourceRow',
           'import_id': importId,
@@ -600,6 +600,24 @@ class LocalDatabase {
           'row_data': jsonEncode(source),
           'created_at': now,
         });
+      }
+
+      Future<void> recordIssue(int index, String outcome, String reason,
+          Map<String, Object?> source) async {
+        final sourceRow = sourceRowNumbers == null ? index + 2 : sourceRowNumbers[index];
+        await recordIssueAt(sourceRow, outcome, reason, source);
+      }
+
+      for (final rejected in preRejectedRows) {
+        final sourceRow = (rejected['source_row'] as num?)?.toInt();
+        final reason = (rejected['reason'] ?? 'पंक्ति मान्य नहीं है').toString();
+        final rowData = rejected['row_data'];
+        if (sourceRow == null) {
+          throw ArgumentError('preRejectedRows requires a numeric source_row');
+        }
+        skipped++;
+        await recordIssueAt(sourceRow, 'invalid', reason,
+          rowData is Map<String, Object?> ? rowData : <String, Object?>{});
       }
 
       for (var index = 0; index < rows.length; index++) {
@@ -715,7 +733,7 @@ class LocalDatabase {
         'module': table,
         'source_name': sourceName,
         'file_name': sourceName,
-        'total_rows': rows.length,
+        'total_rows': rows.length + preRejectedRows.length,
         'imported_rows': imported,
         'skipped_rows': skipped,
         'error_rows': errors,
@@ -724,7 +742,7 @@ class LocalDatabase {
         'details': 'row-level report: import_row_errors',
       });
     });
-    return {'total': rows.length, 'imported': imported, 'skipped': skipped, 'errors': errors};
+    return {'total': rows.length + preRejectedRows.length, 'imported': imported, 'skipped': skipped, 'errors': errors};
   }
 
   Future<Map<String, int>> dashboardCounts() async {

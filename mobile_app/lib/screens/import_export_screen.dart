@@ -63,6 +63,9 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   List<List<String>> _sourceRows = [];
   Map<int, String?> _mapping = {};
   String _sourceName = '';
+  Excel? _workbook;
+  List<String> _sheetNames = [];
+  String? _selectedSheet;
   bool _busy = false;
   Map<String, int>? _result;
   Set<int> _duplicateRows = {};
@@ -97,25 +100,60 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     try {
       final book = Excel.decodeBytes(file.bytes!);
       if (book.tables.isEmpty) throw const FormatException('शीट खाली है।');
-      final sheet = book.tables.values.first;
-      final rows = sheet.rows.map((r) => r.map((c) => c?.value?.toString() ?? '').toList()).toList();
-      if (rows.length < 2) throw const FormatException('कम-से-कम हेडर और एक डेटा पंक्ति होनी चाहिए।');
-      final headers = rows.first;
-      final data = rows.skip(1).where((r) => r.any((v) => v.trim().isNotEmpty))
-        .map((r) => List.generate(headers.length, (i) => i < r.length ? r[i] : '')).toList();
-      final map = <int, String?>{};
-      for (var i = 0; i < headers.length; i++) {
-        final h = _norm(headers[i]);
-        String? match;
-        for (final col in _columns) {
-          final names = <String>[col, ...(_aliases[col] ?? [])];
-          if (names.any((a) => _norm(a) == h) && h.isNotEmpty) { match = col; break; }
-        }
-        map[i] = match;
-      }
-      setState(() { _headers = headers; _sourceRows = data; _mapping = map; _sourceName = file.name; _result = null; _duplicateRows = {}; _invalidRows = {}; _selectedRows = {}; });
-      await _analyseRows();
+      setState(() {
+        _workbook = book;
+        _sheetNames = book.tables.keys.toList();
+        _selectedSheet = _sheetNames.first;
+        _sourceName = file.name;
+        _result = null;
+      });
+      await _readSelectedSheet();
     } catch (e) { _message('Excel फाइल नहीं पढ़ी गई: $e'); }
+  }
+
+  Future<void> _readSelectedSheet() async {
+    final book = _workbook;
+    final sheetName = _selectedSheet;
+    if (book == null || sheetName == null || !book.tables.containsKey(sheetName)) return;
+    final sheet = book.tables[sheetName]!;
+    final rows = sheet.rows
+        .map((r) => r.map((c) => c?.value?.toString() ?? '').toList())
+        .toList();
+    if (rows.length < 2) {
+      _message('चुनी गई शीट में हेडर और कम-से-कम एक डेटा पंक्ति होनी चाहिए।');
+      return;
+    }
+    final headers = rows.first;
+    final data = <List<String>>[];
+    for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+      final row = rows[rowIndex];
+      if (!row.any((v) => v.trim().isNotEmpty)) continue;
+      data.add(List.generate(headers.length, (i) => i < row.length ? row[i] : ''));
+    }
+    final map = <int, String?>{};
+    for (var i = 0; i < headers.length; i++) {
+      final h = _norm(headers[i]);
+      String? match;
+      for (final col in _columns) {
+        final names = <String>[col, ...(_aliases[col] ?? [])];
+        if (names.any((a) => _norm(a) == h) && h.isNotEmpty) {
+          match = col;
+          break;
+        }
+      }
+      map[i] = match;
+    }
+    if (!mounted) return;
+    setState(() {
+      _headers = headers;
+      _sourceRows = data;
+      _mapping = map;
+      _result = null;
+      _duplicateRows = {};
+      _invalidRows = {};
+      _selectedRows = {};
+    });
+    await _analyseRows();
   }
 
   String _convertValue(String column, String value) {
@@ -187,6 +225,15 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   }
 
   Future<void> _import() async {
+    final unmapped = <String>[
+      for (var i = 0; i < _headers.length; i++)
+        if (_headers[i].trim().isNotEmpty && (_mapping[i] == null || _mapping[i]!.isEmpty))
+          _headers[i],
+    ];
+    if (unmapped.isNotEmpty) {
+      _message('पहले इन कॉलम का मिलान करें या उन्हें स्पष्ट रूप से छोड़ने का निर्णय लें: ${unmapped.join(', ')}');
+      return;
+    }
     final allRows = _preview;
     final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_duplicateRows.contains(i) && !_invalidRows.containsKey(i)) allRows[i]];
     if (rows.isEmpty) { _message('Import के लिए कोई वैध रिकॉर्ड चयनित नहीं है।'); return; }
@@ -248,7 +295,23 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       if (_sourceName.isNotEmpty) ...[
         const SizedBox(height: 16),
         Text('फाइल: $_sourceName', style: const TextStyle(fontWeight: FontWeight.w700)),
-        Text('${_sourceRows.length} डेटा पंक्तियाँ • पहली शीट पढ़ी गई', style: Theme.of(context).textTheme.bodySmall),
+        if (_sheetNames.length > 1) ...[
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedSheet,
+            decoration: const InputDecoration(labelText: 'Excel शीट चुनें'),
+            items: _sheetNames.map((name) =>
+              DropdownMenuItem(value: name, child: Text(name))).toList(),
+            onChanged: _busy ? null : (value) async {
+              if (value == null) return;
+              setState(() => _selectedSheet = value);
+              await _readSelectedSheet();
+            },
+          ),
+        ] else if (_selectedSheet != null)
+          Text('शीट: $_selectedSheet', style: Theme.of(context).textTheme.bodySmall),
+        Text('${_sourceRows.length} डेटा पंक्तियाँ • शीट: ${_selectedSheet ?? '—'}',
+          style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 10),
         const Text('कॉलम मिलान', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
         ...List.generate(_headers.length, (i) => Padding(

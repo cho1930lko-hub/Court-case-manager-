@@ -256,3 +256,29 @@ These tests use SQLite FFI and synthetic v4 schemas. They do **not** yet prove t
 4. Explicit review of Dak Google Drive links retained as custom source fields and never interpreted as local attachment paths.
 
 No production database or Google Sheet was modified, and no real records were imported.
+
+
+## Implementation progress — Android SQLCipher migration integration gate
+
+### Added on `phase8-data-migration`
+
+- Added `integration_test/sqlcipher_migration_test.dart`.
+- The test creates a disposable password-encrypted SQLCipher v4 database on Android, verifies its file header is not a plaintext SQLite header, closes it, then reopens it at schema version 5 using the same `migrateSchema` callback wired to the app's `onUpgrade`.
+- The fixture contains a legacy register record with a leading-zero ST number, a dynamic field definition/value, an import-history row, a sentinel table, a custom index, and a trigger.
+- The test checks SQLCipher `PRAGMA integrity_check`, schema version 5, retained register/history data, copied custom-field value, preserved legacy table/index/trigger, and that the trigger still executes after upgrade.
+- Added `.github/workflows/android-sqlcipher-migration.yml` to run this test on an Android API 35 emulator.
+- Added Flutter's `integration_test` SDK dependency.
+
+### Current verification status
+
+- The Android emulator workflow was triggered for commit `87f0d5c273cde7bbc37bf8dc9b757ddd833c5cf7`; run ID `42783347742`.
+- At the time of this update, dependency installation was still in progress. The encrypted migration test has **not yet reported a pass**.
+- The ordinary Flutter test/analyzer workflow for the same commit is run ID `42783347871` and is also pending.
+- This is a synthetic encrypted fixture, not a copy of the user's actual app database. It does not authorize importing real records or deleting legacy data.
+
+### Remaining gates
+
+1. Wait for both workflows and fix any failures before calling the SQLCipher gate passed.
+2. Add a real-device backup → upgrade → reopen → restore test, including restore rollback on a deliberately corrupted disposable backup.
+3. Run four-register XLSX dry-run reconciliation and confirm all source rows are accounted for.
+4. Keep Google Sheets and `main` unchanged until the user approves reconciliation.

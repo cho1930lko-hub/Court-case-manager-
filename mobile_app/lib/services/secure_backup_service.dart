@@ -46,9 +46,9 @@ class SecureBackupService {
     archive.addFile(ArchiveFile('database/sqlcipher_key.txt', keyBytes.length, keyBytes));
 
     final appDir = await getApplicationDocumentsDirectory();
-    // Back up every app-managed attachment directory. Evidence files are
-    // stored separately from case_documents and must travel with the database.
-    for (final rootName in const ['case_documents', 'evidence']) {
+    // Back up every app-managed attachment directory. These files must travel
+    // with the encrypted database so restored records never lose their files.
+    for (final rootName in const ['case_documents', 'evidence', 'dak_attachments']) {
       final managedDir = Directory(p.join(appDir.path, rootName));
       if (!await managedDir.exists()) continue;
       await for (final entity in managedDir.list(recursive: true, followLinks: false)) {
@@ -126,7 +126,8 @@ class SecureBackupService {
       if (entry.name != 'database/court_case_manager.db' &&
           entry.name != 'database/sqlcipher_key.txt' &&
           !entry.name.startsWith('case_documents/') &&
-          !entry.name.startsWith('evidence/')) {
+          !entry.name.startsWith('evidence/') &&
+          !entry.name.startsWith('dak_attachments/')) {
         throw const FormatException('Backup में अनपेक्षित फ़ाइल पाई गई।');
       }
     }
@@ -182,13 +183,14 @@ class SecureBackupService {
       for (final entry in archive.files) {
         if (!entry.isFile) continue;
         if (!entry.name.startsWith('case_documents/') &&
-            !entry.name.startsWith('evidence/')) continue;
+            !entry.name.startsWith('evidence/') &&
+            !entry.name.startsWith('dak_attachments/')) continue;
         final safeRelative = safeManagedFileRelativePath(entry.name);
         final out = File(p.join(staging.path, safeRelative));
         await out.parent.create(recursive: true);
         await out.writeAsBytes(entry.content as List<int>, flush: true);
       }
-      for (final rootName in const ['case_documents', 'evidence']) {
+      for (final rootName in const ['case_documents', 'evidence', 'dak_attachments']) {
         await Directory(p.join(staging.path, rootName)).create(recursive: true);
       }
     } catch (_) {
@@ -203,7 +205,7 @@ class SecureBackupService {
     final hadCurrentDatabase = await currentFile.exists();
     final rollbackPath = '$currentPath.restore_previous';
     final previousDatabaseKey = await SecureDatabaseKey.instance.read();
-    final managedRoots = const ['case_documents', 'evidence'];
+    final managedRoots = const ['case_documents', 'evidence', 'dak_attachments'];
     final oldPaths = <String, String>{
       for (final rootName in managedRoots)
         rootName: p.join(appDir.path, '${rootName}_restore_previous'),

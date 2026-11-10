@@ -224,7 +224,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       _invalidRows = invalid;
       _selectedRows = {
         for (var i = 0; i < values.length; i++)
-          if (!duplicates.contains(i) && !invalid.containsKey(i)) i,
+          if (!invalid.containsKey(i)) i,
       };
     });
   }
@@ -240,13 +240,13 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       return;
     }
     final allRows = _preview;
-    final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_duplicateRows.contains(i) && !_invalidRows.containsKey(i)) allRows[i]];
+    final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_invalidRows.containsKey(i)) allRows[i]];
     if (rows.isEmpty) { _message('Import के लिए कोई वैध रिकॉर्ड चयनित नहीं है।'); return; }
     setState(() => _busy = true);
     try {
       final selectedSourceRows = [
         for (var i = 0; i < _sourceRows.length; i++)
-          if (_selectedRows.contains(i) && !_duplicateRows.contains(i) && !_invalidRows.containsKey(i))
+          if (_selectedRows.contains(i) && !_invalidRows.containsKey(i))
             _sourceRowNumbers[i],
       ];
       final result = await LocalDatabase.instance.importRegisterRows(
@@ -386,7 +386,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
           return CheckboxListTile(
             dense: true, contentPadding: EdgeInsets.zero,
             value: _selectedRows.contains(i),
-            onChanged: issue.isNotEmpty ? null : (v) => setState(() {
+            onChanged: _invalidRows.containsKey(i) ? null : (v) => setState(() {
               if (v == true) { _selectedRows.add(i); } else { _selectedRows.remove(i); }
             }),
             title: Text('पंक्ति ${i < _sourceRowNumbers.length ? _sourceRowNumbers[i] : i + 2} • ${row.values.take(3).where((v) => v.toString().isNotEmpty).join(' / ')}',

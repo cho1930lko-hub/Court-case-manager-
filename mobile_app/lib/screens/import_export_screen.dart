@@ -254,6 +254,17 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     });
   }
 
+  Map<String, Object?> _originalSourceRow(int index) {
+    final original = <String, Object?>{};
+    final row = _sourceRows[index];
+    for (var column = 0; column < _headers.length; column++) {
+      final header = _headers[column].trim().isEmpty
+          ? '(खाली हेडर - कॉलम ${column + 1})'
+          : _headers[column];
+      original[header] = column < row.length ? row[column] : '';
+    }
+    return original;
+  }
   Future<void> _import() async {
     final unmapped = <String>[
       for (var i = 0; i < _headers.length; i++)
@@ -280,7 +291,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       return;
     }
     final allRows = _preview;
-    final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_invalidRows.containsKey(i)) allRows[i]];
+    final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_invalidRows.containsKey(i)) <String, Object?>{...allRows[i], '_source_row_data': _originalSourceRow(i)}];
     if (rows.isEmpty && _invalidRows.isEmpty) {
       _message('Import या समीक्षा रिपोर्ट के लिए कोई पंक्ति चयनित नहीं है।');
       return;
@@ -297,7 +308,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
           <String, Object?>{
             'source_row': _sourceRowNumbers[entry.key],
             'reason': entry.value,
-            'row_data': allRows[entry.key],
+            'row_data': <String, Object?>{'mapped_values': allRows[entry.key], 'original_columns': _originalSourceRow(entry.key)},
           },
       ];
       final result = await LocalDatabase.instance.importRegisterRows(

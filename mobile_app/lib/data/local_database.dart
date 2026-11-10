@@ -39,7 +39,7 @@ class LocalDatabase {
         if (oldVersion < 3) await _createEvidenceTable(db);
         if (oldVersion < 4) await _createDynamicFieldTables(db);
         if (oldVersion < 4) await _createDynamicDataTables(db);
-        if (oldVersion < 5) await _ensurePhase8MigrationSchema(db);
+        if (oldVersion < 5) await ensurePhase8MigrationSchema(db);
       },
     );
     return _db!;
@@ -278,7 +278,7 @@ class LocalDatabase {
 
   /// Additive schema repair for the overlapping v4 dynamic-field table creators.
   /// Existing field definitions and values are retained; only missing columns are added.
-  Future<void> _ensurePhase8MigrationSchema(DatabaseExecutor db) async {
+  Future<void> ensurePhase8MigrationSchema(DatabaseExecutor db) async {
     Future<Set<String>> columns(String table) async {
       final rows = await db.rawQuery('PRAGMA table_info($table)');
       return rows.map((row) => row['name'].toString()).toSet();

@@ -61,6 +61,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   Map<String, String> _columnLabels = {};
   List<String> _headers = [];
   List<List<String>> _sourceRows = [];
+  List<int> _sourceRowNumbers = [];
   Map<int, String?> _mapping = {};
   String _sourceName = '';
   Excel? _workbook;
@@ -125,10 +126,12 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     }
     final headers = rows.first;
     final data = <List<String>>[];
+    final sourceRowNumbers = <int>[];
     for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
       final row = rows[rowIndex];
       if (!row.any((v) => v.trim().isNotEmpty)) continue;
       data.add(List.generate(headers.length, (i) => i < row.length ? row[i] : ''));
+      sourceRowNumbers.add(rowIndex + 1);
     }
     final map = <int, String?>{};
     for (var i = 0; i < headers.length; i++) {
@@ -147,6 +150,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     setState(() {
       _headers = headers;
       _sourceRows = data;
+      _sourceRowNumbers = sourceRowNumbers;
       _mapping = map;
       _result = null;
       _duplicateRows = {};
@@ -175,7 +179,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     final values = <String, Object?>{};
     for (var i = 0; i < _headers.length; i++) {
       final target = _mapping[i];
-      if (target != null && target.isNotEmpty) values[target] = _convertValue(target, i < row.length ? row[i] : '');
+      if (target != null && target.isNotEmpty && target != '__ignore__') values[target] = _convertValue(target, i < row.length ? row[i] : '');
     }
     return values;
   }).toList();
@@ -227,7 +231,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   Future<void> _import() async {
     final unmapped = <String>[
       for (var i = 0; i < _headers.length; i++)
-        if (_headers[i].trim().isNotEmpty && (_mapping[i] == null || _mapping[i]!.isEmpty))
+        if (_headers[i].trim().isNotEmpty && _mapping[i] == null)
           _headers[i],
     ];
     if (unmapped.isNotEmpty) {
@@ -322,9 +326,9 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
             const SizedBox(width: 8),
             Expanded(flex: 6, child: DropdownButtonFormField<String>(
               initialValue: _mapping[i], isExpanded: true, decoration: const InputDecoration(isDense: true),
-              items: [const DropdownMenuItem<String>(value: '', child: Text('छोड़ें')),
+              items: [const DropdownMenuItem<String>(value: '__ignore__', child: Text('जानबूझकर छोड़ें')),
                 ..._columns.map((c) => DropdownMenuItem(value: c, child: Text(_columnLabels[c] ?? c, overflow: TextOverflow.ellipsis)))],
-              onChanged: (v) async { setState(() => _mapping[i] = (v == null || v.isEmpty) ? null : v); await _analyseRows(); },
+              onChanged: (v) async { setState(() => _mapping[i] = v); await _analyseRows(); },
             )),
           ]),
         )),
@@ -341,7 +345,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
             onChanged: issue.isNotEmpty ? null : (v) => setState(() {
               if (v == true) { _selectedRows.add(i); } else { _selectedRows.remove(i); }
             }),
-            title: Text('पंक्ति ${i + 2} • ${row.values.take(3).where((v) => v.toString().isNotEmpty).join(' / ')}',
+            title: Text('पंक्ति ${i < _sourceRowNumbers.length ? _sourceRowNumbers[i] : i + 2} • ${row.values.take(3).where((v) => v.toString().isNotEmpty).join(' / ')}',
               maxLines: 2, overflow: TextOverflow.ellipsis),
             subtitle: issue.isEmpty ? null : Text(issue, style: const TextStyle(color: Colors.deepOrange)),
           );

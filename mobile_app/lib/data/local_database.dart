@@ -700,26 +700,38 @@ class LocalDatabase {
             continue;
           }
 
-          // Null identity fields are not proof of uniqueness. Let the table's own
-          // NOT NULL / UNIQUE constraints reject invalid rows and capture the reason.
-          await txn.insert(table, {
-            ...values,
-            'id': id,
-            'created_at': now,
-            if (table == 'cases' || table == 'dak_register') 'updated_at': now,
-          }, conflictAlgorithm: ConflictAlgorithm.abort);
+          // Treat one source row as an atomic unit. If a custom-field write fails
+          // after the register row was inserted, roll the whole row back so the
+          // exception report can never disagree with a partially persisted record.
+          final savepoint = 'import_row_$index';
+          await txn.execute('SAVEPOINT $savepoint');
+          try {
+            // Null identity fields are not proof of uniqueness. Let the table's
+            // NOT NULL / UNIQUE constraints reject invalid rows and capture the reason.
+            await txn.insert(table, {
+              ...values,
+              'id': id,
+              'created_at': now,
+              if (table == 'cases' || table == 'dak_register') 'updated_at': now,
+            }, conflictAlgorithm: ConflictAlgorithm.abort);
 
-          for (final entry in customValues.entries) {
-            await txn.insert('custom_field_values', {
-              'id': '${table}_${id}_${entry.key}',
-              'module': table,
-              'record_id': id,
-              'field_id': entry.key,
-              'value': entry.value,
-              'updated_at': now,
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
+            for (final entry in customValues.entries) {
+              await txn.insert('custom_field_values', {
+                'id': '${table}_${id}_${entry.key}',
+                'module': table,
+                'record_id': id,
+                'field_id': entry.key,
+                'value': entry.value,
+                'updated_at': now,
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+            await txn.execute('RELEASE SAVEPOINT $savepoint');
+            imported++;
+          } catch (_) {
+            await txn.execute('ROLLBACK TO SAVEPOINT $savepoint');
+            await txn.execute('RELEASE SAVEPOINT $savepoint');
+            rethrow;
           }
-          imported++;
         } catch (error) {
           errors++;
           await recordIssue(index, 'error', error.toString(), source);

@@ -118,3 +118,32 @@ Next implementation steps:
 5. Run Flutter tests/analyzer/build and Android device recovery tests after Phase 7 safety gates.
 6. Import fresh read-only exports only after the above checks, then reconcile source totals and key-field samples. Keep the source Sheets unchanged.
 
+## Implementation progress — import exception and identity-key hardening
+
+### Implemented on `phase8-data-migration`
+
+- Database schema version raised from 4 to 5 with additive repair for the overlapping v4 metadata creators.
+- Missing `field_definitions.is_system`, `allowed_roles`, and `is_dropdown` columns are added without dropping existing definitions.
+- `import_history` is repaired to contain both legacy column-name sets (`file_name/imported_at` and `source_name/created_at`) so the existing history writer and reader can operate together.
+- Added `import_row_errors` to preserve each skipped, duplicate, manual-review, or failed row with original Excel row number, outcome, reason, source filename/sheet, and original mapped row values.
+- Existing `field_values` rows are copied with `INSERT OR IGNORE` into the app's active `custom_field_values` table; the old table is retained.
+- Import now receives the original Excel row numbers from the preview and shows the row-level exception report. The report can also be exported to XLSX.
+- Automatic import requires a complete identity key:
+  - Session Court: ST NO
+  - Dak: STN + Type; same STN with a different Type is flagged for manual review
+  - Rimand: FIR number + remand date
+  - Address Book: mobile number; same mobile with a different name is flagged for manual review
+- Incomplete identity keys are not silently treated as unique and are sent to manual review rather than auto-imported.
+
+### Validation performed
+
+- Reviewed the committed source changes on GitHub.
+- Ran a local SQLite schema simulation for the combined `import_history` column set and `import_row_errors` insert path; the simulation succeeded.
+- This SQLite simulation is **not** a Flutter/SQLCipher device test.
+- Flutter analyzer, Flutter unit tests, APK build, and Android device testing remain unrun because the Flutter/Dart SDK and Android device are not available in this execution environment.
+- No live Google Sheet was read or changed; no real records were imported.
+
+### Next gate
+
+Create and run synthetic XLSX tests for all four registers, then run Flutter analyzer/tests/build and Android device verification before any real migration. Review all `needs_review` and `error` rows before approving an import.
+

@@ -29,7 +29,7 @@ jobs:
         run: flutter pub get
 
       - name: Run import validation and workbook tests
-        run: flutter test test/import_validation_test.dart
+        run: flutter test
 
       - name: Analyze Flutter project
         run: flutter analyze

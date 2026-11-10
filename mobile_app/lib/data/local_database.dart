@@ -315,6 +315,20 @@ class LocalDatabase {
       )
     ''');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_import_row_errors_import ON import_row_errors(import_id, source_row)');
+
+    // v4 created both value tables with overlapping purposes. Copy any legacy
+    // field_values rows into the table used by the app; keep the source table intact.
+    final legacyValueTable = await columns('field_values');
+    if (legacyValueTable.containsAll({
+      'id', 'module', 'record_id', 'field_id', 'value', 'updated_at',
+    })) {
+      await db.execute('''
+        INSERT OR IGNORE INTO custom_field_values
+          (id, module, record_id, field_id, value, updated_at)
+        SELECT id, module, record_id, field_id, value, updated_at
+        FROM field_values
+      ''');
+    }
   }
 
   Future<List<Map<String, Object?>>> latestImportRowErrors(

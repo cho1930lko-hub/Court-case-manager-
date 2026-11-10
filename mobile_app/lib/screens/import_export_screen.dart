@@ -170,20 +170,35 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     final raw = value.trim();
     if (!dateColumns.contains(column) || raw.isEmpty) return true;
 
-    final indian = RegExp(r'^(\\d{1,2})[./-](\\d{1,2})[./-](\\d{4})
+    final indian = RegExp(r'^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$').firstMatch(raw);
+    final iso = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(raw);
+    if (indian == null && iso == null) return false;
+    final year = int.parse(indian != null ? indian.group(3)! : iso!.group(1)!);
+    final month = int.parse(indian != null ? indian.group(2)! : iso!.group(2)!);
+    final day = int.parse(indian != null ? indian.group(1)! : iso!.group(3)!);
+    if (year < 1900 || month < 1 || month > 12 || day < 1) return false;
+    final parsed = DateTime(year, month, day);
+    return parsed.year == year && parsed.month == month && parsed.day == day;
+  }
+
+  String _convertValue(String column, String value) {
+    final v = value.trim();
     if (v.isEmpty) return '';
     if (column == 'total_witnesses') return int.tryParse(v)?.toString() ?? v;
-    // Keep case/ST numbers as text; convert common Indian date formats to DD/MM/YYYY.
-    final dateColumns = {'next_hearing','previous_hearing','fir_date','charge_sheet_date',
-      'cognizance_date','charge_framed_date','station_received_date','hearing_date',
-      'remand_date','first_remand_date'};
+    // Keep identifiers as text; normalize only unambiguous Indian date strings.
+    const dateColumns = {
+      'next_hearing', 'previous_hearing', 'fir_date', 'charge_sheet_date',
+      'cognizance_date', 'charge_framed_date', 'station_received_date',
+      'hearing_date', 'remand_date', 'first_remand_date',
+    };
     if (dateColumns.contains(column)) {
-      final m = RegExp(r'^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$').firstMatch(v);
-      if (m != null) return '${m.group(1)!.padLeft(2,'0')}/${m.group(2)!.padLeft(2,'0')}/${m.group(3)}';
+      final match = RegExp(r'^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$').firstMatch(v);
+      if (match != null && _isValidDateValue(column, v)) {
+        return '${match.group(1)!.padLeft(2, '0')}/${match.group(2)!.padLeft(2, '0')}/${match.group(3)}';
+      }
     }
     return v;
   }
-
   List<Map<String, Object?>> get _preview => _sourceRows.map((row) {
     final values = <String, Object?>{};
     for (var i = 0; i < _headers.length; i++) {

@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate Android platform project
+        run: flutter create --platforms=android --org in.gov.courtcases --project-name court_case_manager .
+
       - name: Run Android SQLCipher v4 to v5 migration test
         uses: reactivecircus/android-emulator-runner@v2
         with:

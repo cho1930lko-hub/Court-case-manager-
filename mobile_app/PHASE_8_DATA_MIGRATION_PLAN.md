@@ -92,3 +92,29 @@ Next implementation steps:
 4. Test using a synthetic workbook containing Hindi/English headers, leading-zero ST NO/FIR values, blank keys, repeated records, mixed date formats, and Dak links.
 5. Only after those tests pass, use fresh read-only XLSX exports of all four legacy sheets for the real migration and reconciliation. Keep the source untouched.
 
+## Implementation progress — 2026-11-10
+
+### Completed on `phase8-data-migration`
+
+- Added explicit Hindi/English aliases for the known legacy headers in the Android importer.
+- Added Excel worksheet selection when a workbook contains multiple sheets; the user can select the intended sheet instead of the importer silently reading only the first one.
+- Added original worksheet row numbers to the import preview. Blank rows are filtered from preview without renumbering the remaining source rows.
+- Unknown non-empty headers now block import until the user maps them to an existing field / configured custom field, or explicitly chooses **जानबूझकर छोड़ें**. This prevents accidental silent loss of unknown columns.
+- A legacy Dak `लिंक` column should be mapped to a configured custom field if its URL needs to be retained. It must not be mapped to `attachment_path`.
+
+### Verification status
+
+- GitHub source inspection confirms the changes are committed on this branch.
+- No GitHub Actions workflow run was returned for the latest commit.
+- Flutter analyzer, automated tests, APK build, and Android device testing have **not** been run in this environment. Do not treat source edits as runtime validation.
+- No actual Google Sheet was accessed and no real records were imported.
+
+### Remaining before real migration
+
+1. Pass original worksheet row numbers into the import service and persist row-level rejection reasons in an import exception report.
+2. Fix the mismatch between the duplicated dynamic-field schema creators before relying on custom-field import on upgraded databases.
+3. Add synthetic XLSX fixtures for all four registers, including multiple worksheets, blank rows, duplicate keys, leading-zero identifiers, mixed date values, and Dak source links.
+4. Verify duplicate rules and null-key handling in the database import service; a blank identity must never be treated as proof of uniqueness.
+5. Run Flutter tests/analyzer/build and Android device recovery tests after Phase 7 safety gates.
+6. Import fresh read-only exports only after the above checks, then reconcile source totals and key-field samples. Keep the source Sheets unchanged.
+

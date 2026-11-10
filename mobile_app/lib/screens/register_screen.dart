@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import '../services/dak_attachment_service.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/local_database.dart';
@@ -106,6 +109,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
       builder: (_) => _RegisterForm(config: widget.config, initial: row));
     if (result == null) return;
     final id = (row?['id'] ?? const Uuid().v4()).toString();
+    String? committedAttachment;
+    final stagedAttachment = result['__dak_attachment_staged']?.toString() ?? '';
+    result.remove('__dak_attachment_staged');
+    if (stagedAttachment.isNotEmpty) {
+      try {
+        committedAttachment = await DakAttachmentService.instance.commit(stagedAttachment, id);
+        result['attachment_path'] = committedAttachment;
+      } catch (e) {
+        await DakAttachmentService.instance.discard(stagedAttachment);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('अटैचमेंट सेव नहीं हुआ: $e')));
+        return;
+      }
+    }
     final values = <String, Object?>{};
     final customValues = <String, String>{};
     for (final entry in result.entries) {
@@ -127,6 +143,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(row == null ? 'रिकॉर्ड सेव हो गया।' : 'रिकॉर्ड अपडेट हो गया।')));
     } catch (e) {
+      if (committedAttachment != null) {
+        final file = File(committedAttachment!);
+        if (await file.exists()) await file.delete();
+      }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('सेव नहीं हुआ: ' + e.toString())));
     }
   }
@@ -272,10 +292,13 @@ class _RegisterFormState extends State<_RegisterForm> {
   final Map<String, TextEditingController> _customControllers = {};
   final Map<String, String> _customDropdowns = {};
   final Map<String, List<Map<String, Object?>>> _customOptions = {};
+  String _dakAttachmentPath = '';
+  String? _stagedDakAttachment;
 
   @override
   void initState() {
     super.initState();
+    _dakAttachmentPath = (widget.initial?['attachment_path'] ?? '').toString();
     for (final field in widget.config.fields) {
       _controllers[field.key] = TextEditingController(text: (widget.initial?[field.key] ?? '').toString());
     }
@@ -360,6 +383,64 @@ class _RegisterFormState extends State<_RegisterForm> {
     final month = picked.month.toString().padLeft(2, '0');
     controller.text = '$day/$month/${picked.year}';
     setState(() {});
+  }
+
+
+  Future<void> _pickDakAttachment() async {
+    try {
+      final staged = await DakAttachmentService.instance.pickAndStage();
+      if (staged == null || !mounted) return;
+      await DakAttachmentService.instance.discard(_stagedDakAttachment);
+      setState(() => _stagedDakAttachment = staged);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('फाइल नहीं चुनी गई: $e')),
+      );
+    }
+  }
+
+  Widget _dakAttachmentCard() {
+    if (widget.config.table != 'dak_register') return const SizedBox.shrink();
+    final path = _stagedDakAttachment ?? _dakAttachmentPath;
+    final hasFile = path.trim().isNotEmpty;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.attach_file_rounded, color: AppTheme.blue),
+            const SizedBox(width: 8),
+            Expanded(child: Text('डाक का संलग्नक', style: Theme.of(context).textTheme.titleMedium)),
+            TextButton.icon(
+              onPressed: _pickDakAttachment,
+              icon: const Icon(Icons.upload_file_rounded),
+              label: Text(hasFile ? 'बदलें' : 'फाइल जोड़ें'),
+            ),
+          ]),
+          if (hasFile) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              const Icon(Icons.insert_drive_file_outlined, color: AppTheme.muted),
+              const SizedBox(width: 8),
+              Expanded(child: Text(p.basename(path), maxLines: 2, overflow: TextOverflow.ellipsis)),
+              IconButton(
+                tooltip: 'संलग्नक हटाएँ',
+                onPressed: () async {
+                  await DakAttachmentService.instance.discard(_stagedDakAttachment);
+                  setState(() {
+                    _stagedDakAttachment = null;
+                    _dakAttachmentPath = '';
+                  });
+                },
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ]),
+          ] else
+            const Text('PDF, JPG, PNG, DOCX या XLSX • अधिकतम 20 MB',
+              style: TextStyle(fontSize: 12, color: AppTheme.muted)),
+        ]),
+      ),
+    );
   }
 
   List<Map<String, Object?>> _formSections() {
@@ -527,6 +608,8 @@ class _RegisterFormState extends State<_RegisterForm> {
                         _sectionCard(section),
                         const SizedBox(height: 12),
                       ],
+                      _dakAttachmentCard(),
+                      if (widget.config.table == 'dak_register') const SizedBox(height: 12),
                       _customFieldsCard(),
                       if (_customFields.isNotEmpty) const SizedBox(height: 12),
                       const SizedBox(height: 14),
@@ -534,7 +617,10 @@ class _RegisterFormState extends State<_RegisterForm> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () async {
+                                await DakAttachmentService.instance.discard(_stagedDakAttachment);
+                                if (context.mounted) Navigator.pop(context);
+                              },
                               child: const Text('रद्द करें'),
                             ),
                           ),
@@ -546,6 +632,8 @@ class _RegisterFormState extends State<_RegisterForm> {
                                 if (!_formKey.currentState!.validate()) return;
                                 Navigator.pop(context, {
                                   for (final e in _controllers.entries) e.key: e.value.text.trim(),
+                                  if (widget.config.table == 'dak_register') 'attachment_path': _dakAttachmentPath,
+                                  if (_stagedDakAttachment != null) '__dak_attachment_staged': _stagedDakAttachment!,
                                   for (final e in _customControllers.entries) '__custom__:${e.key}': e.value.text.trim(),
                                   for (final e in _customDropdowns.entries) '__custom__:${e.key}': e.value,
                                 });

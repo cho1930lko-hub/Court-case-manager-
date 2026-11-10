@@ -10,17 +10,14 @@ void main() {
 
   testWidgets(
     'encrypted SQLCipher v4 database upgrades to v5 without losing legacy data',
-    (tester) async {
+    (_) async {
       const password = 'phase8-sqlcipher-fixture-key-2026';
       final root = await getDatabasesPath();
       final path = p.join(root, 'phase8_sqlcipher_v4_fixture.db');
 
       // This is a disposable test fixture only; never point this test at the
       // application's production database filename.
-      for (final suffix in ['', '-wal', '-shm']) {
-        final file = await databaseExists('$path$suffix');
-        if (file) await deleteDatabase('$path$suffix');
-      }
+      if (await databaseExists(path)) await deleteDatabase(path);
 
       final legacy = await openDatabase(
         path,

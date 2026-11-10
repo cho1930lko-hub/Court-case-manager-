@@ -266,6 +266,19 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       _message('पहले इन कॉलम का मिलान करें या उन्हें स्पष्ट रूप से छोड़ने का निर्णय लें: ${unmapped.join(', ')}');
       return;
     }
+    final targets = <String, List<String>>{};
+    for (var i = 0; i < _headers.length; i++) {
+      final target = _mapping[i];
+      if (target != null && target != '__ignore__') {
+        targets.putIfAbsent(target, () => []).add(
+          _headers[i].trim().isEmpty ? 'कॉलम ${i + 1}' : _headers[i]);
+      }
+    }
+    final collisions = targets.entries.where((entry) => entry.value.length > 1).toList();
+    if (collisions.isNotEmpty) {
+      _message('एक ही ऐप फ़ील्ड पर कई Excel कॉलम मिल रहे हैं। हर फ़ील्ड के लिए केवल एक कॉलम रखें: ${collisions.map((e) => e.value.join(' / ')).join('; ')}');
+      return;
+    }
     final allRows = _preview;
     final rows = [for (var i = 0; i < allRows.length; i++) if (_selectedRows.contains(i) && !_invalidRows.containsKey(i)) allRows[i]];
     if (rows.isEmpty && _invalidRows.isEmpty) {

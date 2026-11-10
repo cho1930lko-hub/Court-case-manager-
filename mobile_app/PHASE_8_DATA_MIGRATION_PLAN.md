@@ -231,3 +231,28 @@ The simulation stored 9 exception rows. This verifies the intended SQL/rule beha
 1. Review the first GitHub Actions result and fix any compile/test/analyzer failures.
 2. Add database-level tests for duplicate detection, row-error persistence, and no-overwrite guarantees using a test database adapter.
 3. Add SQLCipher schema-upgrade tests from the actual v4 database layouts before approving any live-data import.
+
+## Database import transaction tests and v4→v5 schema-repair tests
+
+### CI verification — 2026-11-10
+
+- GitHub Actions run [42773295724](https://github.com/cho1930lko-hub/Court-case-manager-/actions/runs/42773295724) completed successfully on commit `5dccdbc8b7bec08f7a8eb1d8b4653f0507fbd65d`.
+- The full `flutter test` suite and `flutter analyze` both passed.
+- Database import tests now cover duplicate protection/no-overwrite, row-level error persistence, rollback after a custom-field write failure, and preview-rejected rows.
+- Import writes now use a per-row SQLite savepoint so a register row and its custom-field values commit or roll back together.
+
+### Added migration coverage
+
+- Added `test/database_migration_test.dart` to exercise the exact additive v5 schema-repair routine against synthetic v4 table layouts.
+- Coverage includes both historical `import_history` column variants, retention of existing history rows, addition of missing field-definition metadata, preservation/copying of legacy `field_values`, creation of `import_row_errors`, and safe repeat execution.
+- The schema-repair routine is now callable by the test suite and remains the same routine invoked by the database upgrade callback.
+
+### Remaining hard safety gate
+
+These tests use SQLite FFI and synthetic v4 schemas. They do **not** yet prove the full encrypted SQLCipher file upgrade, preservation of every real legacy table/index/trigger, or Android device behavior. Before real migration, still require:
+1. SQLCipher encrypted v4 fixture upgraded through the app's actual openDatabase/onUpgrade path, with integrity check and row-count/value reconciliation.
+2. Android device test of backup → upgrade → reopen → restore, including rollback on a deliberately corrupted test copy.
+3. Four-register XLSX dry-run reconciliation with source-row totals = imported + duplicate/skipped + invalid/error/review.
+4. Explicit review of Dak Google Drive links retained as custom source fields and never interpreted as local attachment paths.
+
+No production database or Google Sheet was modified, and no real records were imported.

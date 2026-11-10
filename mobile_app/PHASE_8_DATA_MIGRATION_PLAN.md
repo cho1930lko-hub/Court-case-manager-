@@ -282,3 +282,24 @@ No production database or Google Sheet was modified, and no real records were im
 2. Add a real-device backup → upgrade → reopen → restore test, including restore rollback on a deliberately corrupted disposable backup.
 3. Run four-register XLSX dry-run reconciliation and confirm all source rows are accounted for.
 4. Keep Google Sheets and `main` unchanged until the user approves reconciliation.
+
+
+## Phase 9 — Dak photo and attachment (initial implementation)
+
+### Implemented on `phase8-data-migration`
+
+- Added `DakAttachmentService` to pick supported document/image formats and stage them in app-private storage before the Dak record is committed.
+- Supported extensions: PDF, JPG/JPEG, PNG, WEBP, DOC/DOCX, XLS/XLSX. Maximum file size is 20 MB.
+- The service verifies copied file length, uses generated filenames, sanitizes record-folder names, and moves staged files into a record-specific private folder only after the form is submitted.
+- Integrated an attachment control into the Dak Register form. Existing `attachment_path` values remain supported; selecting a replacement does not overwrite the old file.
+- If the Dak database save fails after a new file is committed, the new copied file is removed. Cancelling the form discards the staged file.
+- The existing imported Dak `लिंक` remains a custom field/source URL; it is not mapped to `attachment_path`.
+
+### Not yet verified / remaining Phase 9 gates
+
+- GitHub Actions must pass Flutter tests and analyzer after this integration.
+- Add Android-device tests for PDF/image/document selection, cancel, replacement, save failure, backup/restore portability, and missing-file handling.
+- Add attachment open/share/preview and a clear indication when the stored file is missing.
+- Add cleanup/reporting for abandoned staging files and safe orphan-file review; do not auto-delete existing attachments.
+- Verify that backup/restore includes the new `dak_attachments` directory. Until verified, do not rely on Dak attachments as backed-up records.
+- No production records or source Google Sheets were accessed or changed.

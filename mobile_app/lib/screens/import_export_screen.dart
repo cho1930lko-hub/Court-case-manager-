@@ -262,6 +262,39 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
     finally { if (mounted) setState(() => _busy = false); }
   }
 
+  Future<void> _exportImportIssues() async {
+    if (_importErrors.isEmpty) {
+      _message('इस Import के लिए कोई समीक्षा पंक्ति नहीं है।');
+      return;
+    }
+    try {
+      final book = Excel.createExcel();
+      final sheet = book['Import Review'];
+      sheet.appendRow([
+        TextCellValue('Excel Row'),
+        TextCellValue('Outcome'),
+        TextCellValue('Reason'),
+        TextCellValue('Original Row Data'),
+      ]);
+      for (final issue in _importErrors) {
+        sheet.appendRow([
+          IntCellValue((issue['source_row'] as num?)?.toInt() ?? 0),
+          TextCellValue((issue['outcome'] ?? '').toString()),
+          TextCellValue((issue['reason'] ?? '').toString()),
+          TextCellValue((issue['row_data'] ?? '').toString()),
+        ]);
+      }
+      final bytes = book.encode();
+      if (bytes == null) throw StateError('Review report Excel file was not created.');
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/import_review_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+      await file.writeAsBytes(bytes, flush: true);
+      await Share.shareXFiles([XFile(file.path)], text: 'Import row review — ${_modules[_module]}');
+    } catch (e) {
+      _message('Review रिपोर्ट Export नहीं हुई: $e');
+    }
+  }
+
   Future<void> _export() async {
     setState(() => _busy = true);
     try {
@@ -375,6 +408,15 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
           Text('Duplicate / खाली छोड़े: ${_result!['skipped']}'),
           Text('त्रुटियाँ: ${_result!['errors']}'),
           Text('मैनुअल समीक्षा / Duplicate / छोड़े गए: ${_importErrors.length}'),
+          if (_importErrors.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : _exportImportIssues,
+                icon: const Icon(Icons.file_download_outlined),
+                label: const Text('समीक्षा रिपोर्ट Excel में Export करें'),
+              ),
+            ),
           if (_importErrors.isNotEmpty) ...[
             const Divider(),
             const Text('पंक्ति-वार समीक्षा रिपोर्ट', style: TextStyle(fontWeight: FontWeight.w700)),

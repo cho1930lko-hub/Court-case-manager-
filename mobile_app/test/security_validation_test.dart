@@ -52,12 +52,15 @@ void main() {
           'case-1/order.pdf');
       expect(safeManagedFileRelativePath('evidence/case-1/seizure-photo.jpg'),
           'evidence/case-1/seizure-photo.jpg');
+      expect(safeManagedFileRelativePath('dak_attachments/record-1/order.pdf'),
+          'dak_attachments/record-1/order.pdf');
     });
 
     test('rejects unknown roots, empty segments and traversal in evidence paths', () {
       for (final path in [
         'other/case-1/file.pdf',
         'evidence/../outside.pdf',
+        'dak_attachments/../outside.pdf',
         'evidence/case-1/../../outside.pdf',
         'evidence//file.pdf',
         r'evidence\\case-1\\..\\..\\outside.pdf',

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:math';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_sqlcipher/sqflite.dart';
@@ -22,7 +23,7 @@ class LocalDatabase {
     _db = await openDatabase(
       path,
       password: key,
-      version: 4,
+      version: 5,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         // journal_mode returns a result row; use rawQuery rather than execute.
@@ -34,6 +35,7 @@ class LocalDatabase {
         if (oldVersion < 3) await _createEvidenceTable(db);
         if (oldVersion < 4) await _createDynamicFieldTables(db);
         if (oldVersion < 4) await _createDynamicDataTables(db);
+        if (oldVersion < 5) await _ensurePhase8MigrationSchema(db);
       },
     );
     return _db!;
@@ -230,6 +232,7 @@ class LocalDatabase {
     await _createEvidenceTable(db);
     await _createDynamicFieldTables(db);
     await _createDynamicDataTables(db);
+    await _ensurePhase8MigrationSchema(db);
   }
 
   Future<void> _createDynamicDataTables(Database db) async {
@@ -267,6 +270,64 @@ class LocalDatabase {
     )''');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_field_values_record ON field_values(module, record_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_field_definitions_module ON field_definitions(module, is_active)');
+  }
+
+  /// Additive schema repair for the overlapping v4 dynamic-field table creators.
+  /// Existing field definitions and values are retained; only missing columns are added.
+  Future<void> _ensurePhase8MigrationSchema(DatabaseExecutor db) async {
+    Future<Set<String>> columns(String table) async {
+      final rows = await db.rawQuery('PRAGMA table_info($table)');
+      return rows.map((row) => row['name'].toString()).toSet();
+    }
+
+    Future<void> addMissing(String table, Map<String, String> definitions) async {
+      final existing = await columns(table);
+      for (final entry in definitions.entries) {
+        if (!existing.contains(entry.key)) {
+          await db.execute('ALTER TABLE $table ADD COLUMN ${entry.key} ${entry.value}');
+        }
+      }
+    }
+
+    await addMissing('field_definitions', {
+      'is_system': 'INTEGER NOT NULL DEFAULT 0',
+      'allowed_roles': "TEXT NOT NULL DEFAULT 'admin,staff'",
+      'is_dropdown': 'INTEGER NOT NULL DEFAULT 0',
+    });
+    await addMissing('import_history', {
+      'file_name': "TEXT NOT NULL DEFAULT ''",
+      'source_name': "TEXT NOT NULL DEFAULT ''",
+      'imported_at': "TEXT NOT NULL DEFAULT ''",
+      'created_at': "TEXT NOT NULL DEFAULT ''",
+      'details': "TEXT NOT NULL DEFAULT ''",
+    });
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS import_row_errors (
+        id TEXT PRIMARY KEY,
+        import_id TEXT NOT NULL,
+        module TEXT NOT NULL,
+        source_name TEXT NOT NULL,
+        source_row INTEGER NOT NULL,
+        outcome TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        row_data TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_import_row_errors_import ON import_row_errors(import_id, source_row)');
+  }
+
+  Future<List<Map<String, Object?>>> latestImportRowErrors(
+      String module, String sourceName) async {
+    final db = await database;
+    final history = await db.query('import_history',
+      columns: ['id'], where: 'module = ? AND source_name = ?',
+      whereArgs: [module, sourceName], orderBy: 'created_at DESC, imported_at DESC',
+      limit: 1);
+    if (history.isEmpty) return [];
+    return db.query('import_row_errors',
+      where: 'import_id = ?', whereArgs: [history.first['id']],
+      orderBy: 'source_row ASC');
   }
 
   Future<void> _createEvidenceTable(Database db) async {
@@ -492,16 +553,43 @@ class LocalDatabase {
   }
 
   /// Imports rows atomically. Existing records are never overwritten.
+  /// Imports selected rows without overwriting existing records.
+  /// Every skipped or failed source row is retained in import_row_errors for review.
   Future<Map<String, int>> importRegisterRows(String table,
-      List<Map<String, Object?>> rows, {required String sourceName}) async {
+      List<Map<String, Object?>> rows, {
+        required String sourceName,
+        List<int>? sourceRowNumbers,
+      }) async {
     const allowed = {'cases', 'dak_register', 'remand_register', 'address_book'};
     if (!allowed.contains(table)) throw ArgumentError('Unsupported import table');
+    if (sourceRowNumbers != null && sourceRowNumbers.length != rows.length) {
+      throw ArgumentError('sourceRowNumbers length must match rows length');
+    }
     final db = await database;
     final columns = await importableColumns(table);
     final now = DateTime.now().toIso8601String();
+    final importId = '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
     var imported = 0, skipped = 0, errors = 0;
+
     await db.transaction((txn) async {
-      for (final source in rows) {
+      Future<void> recordIssue(int index, String outcome, String reason,
+          Map<String, Object?> source) async {
+        final sourceRow = sourceRowNumbers == null ? index + 2 : sourceRowNumbers[index];
+        await txn.insert('import_row_errors', {
+          'id': '${importId}_$sourceRow',
+          'import_id': importId,
+          'module': table,
+          'source_name': sourceName,
+          'source_row': sourceRow,
+          'outcome': outcome,
+          'reason': reason,
+          'row_data': jsonEncode(source),
+          'created_at': now,
+        });
+      }
+
+      for (var index = 0; index < rows.length; index++) {
+        final source = rows[index];
         final values = <String, Object?>{};
         final customValues = <String, String>{};
         for (final entry in source.entries) {
@@ -514,52 +602,86 @@ class LocalDatabase {
             values[entry.key] = entry.value;
           }
         }
+
         if (values.values.every((v) => v.toString().trim().isEmpty) && customValues.isEmpty) {
           skipped++;
+          await recordIssue(index, 'skipped', 'रिकॉर्ड में कोई mapped value नहीं है', source);
           continue;
         }
+
         try {
-          final id = (values.remove('id') ?? '${DateTime.now().microsecondsSinceEpoch}-$imported').toString();
+          final id = (values.remove('id') ??
+              '${DateTime.now().microsecondsSinceEpoch}-$index').toString();
           final duplicate = switch (table) {
             'cases' => (values['st_no']?.toString().trim().isNotEmpty ?? false)
-              ? await txn.query(table, columns: ['id'], where: 'st_no = ?', whereArgs: [values['st_no'].toString()], limit: 1)
+              ? await txn.query(table, columns: ['id'], where: 'st_no = ?',
+                  whereArgs: [values['st_no'].toString()], limit: 1)
               : <Map<String, Object?>>[],
             'address_book' => (values['mobile']?.toString().trim().isNotEmpty ?? false)
-              ? await txn.query(table, columns: ['id'], where: 'mobile = ?', whereArgs: [values['mobile'].toString()], limit: 1)
+              ? await txn.query(table, columns: ['id'], where: 'mobile = ?',
+                  whereArgs: [values['mobile'].toString()], limit: 1)
               : <Map<String, Object?>>[],
-            'remand_register' => (values['fir_no']?.toString().trim().isNotEmpty ?? false)
-              ? await txn.query(table, columns: ['id'], where: 'fir_no = ? AND remand_date = ?',
-                  whereArgs: [values['fir_no'].toString(), values['remand_date']?.toString() ?? ''], limit: 1)
+            'remand_register' =>
+              (values['fir_no']?.toString().trim().isNotEmpty ?? false) &&
+              (values['remand_date']?.toString().trim().isNotEmpty ?? false)
+              ? await txn.query(table, columns: ['id'],
+                  where: 'fir_no = ? AND remand_date = ?',
+                  whereArgs: [values['fir_no'].toString(), values['remand_date'].toString()],
+                  limit: 1)
               : <Map<String, Object?>>[],
             _ => (values['st_no']?.toString().trim().isNotEmpty ?? false)
-              ? await txn.query(table, columns: ['id'], where: 'st_no = ? AND dak_type = ?',
-                  whereArgs: [values['st_no'].toString(), values['dak_type']?.toString() ?? ''], limit: 1)
+              ? await txn.query(table, columns: ['id'],
+                  where: 'st_no = ? AND dak_type = ?',
+                  whereArgs: [values['st_no'].toString(), values['dak_type']?.toString() ?? ''],
+                  limit: 1)
               : <Map<String, Object?>>[],
           };
-          if (duplicate.isNotEmpty) { skipped++; continue; }
+          if (duplicate.isNotEmpty) {
+            skipped++;
+            await recordIssue(index, 'duplicate', 'पहचान कुंजी से मिलता-जुलता रिकॉर्ड पहले से मौजूद है', source);
+            continue;
+          }
+
+          // Null identity fields are not proof of uniqueness. Let the table's own
+          // NOT NULL / UNIQUE constraints reject invalid rows and capture the reason.
           await txn.insert(table, {
             ...values,
             'id': id,
             'created_at': now,
             if (table == 'cases' || table == 'dak_register') 'updated_at': now,
           }, conflictAlgorithm: ConflictAlgorithm.abort);
+
           for (final entry in customValues.entries) {
             await txn.insert('custom_field_values', {
-              'id': '${table}_${id}_${entry.key}', 'module': table,
-              'record_id': id, 'field_id': entry.key, 'value': entry.value,
+              'id': '${table}_${id}_${entry.key}',
+              'module': table,
+              'record_id': id,
+              'field_id': entry.key,
+              'value': entry.value,
               'updated_at': now,
             }, conflictAlgorithm: ConflictAlgorithm.replace);
           }
           imported++;
-        } catch (_) { errors++; }
+        } catch (error) {
+          errors++;
+          await recordIssue(index, 'error', error.toString(), source);
+        }
       }
+
       await _insertAudit(txn, 'BULK_IMPORT_COMPLETED', table, '',
-        'source=$sourceName; imported=$imported; skipped=$skipped; errors=$errors');
+        'import_id=$importId; source=$sourceName; imported=$imported; skipped=$skipped; errors=$errors');
       await txn.insert('import_history', {
-        'id': '${DateTime.now().microsecondsSinceEpoch}',
-        'module': table, 'source_name': sourceName, 'total_rows': rows.length,
-        'imported_rows': imported, 'skipped_rows': skipped, 'error_rows': errors,
+        'id': importId,
+        'module': table,
+        'source_name': sourceName,
+        'file_name': sourceName,
+        'total_rows': rows.length,
+        'imported_rows': imported,
+        'skipped_rows': skipped,
+        'error_rows': errors,
         'created_at': now,
+        'imported_at': now,
+        'details': 'row-level report: import_row_errors',
       });
     });
     return {'total': rows.length, 'imported': imported, 'skipped': skipped, 'errors': errors};

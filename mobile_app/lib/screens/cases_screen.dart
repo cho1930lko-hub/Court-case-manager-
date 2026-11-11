@@ -379,6 +379,7 @@ class _CaseFormState extends State<_CaseForm> {
   late final TextEditingController nextHearing;
   late final TextEditingController action;
   String status = 'साक्ष्य';
+  String summonsStatus = 'बनाना है';
   List<Map<String, Object?>> customFields = [];
   final Map<String, TextEditingController> customControllers = {};
   final Map<String, String> customDropdowns = {};
@@ -397,6 +398,7 @@ class _CaseFormState extends State<_CaseForm> {
     nextHearing = TextEditingController(text: '${r['next_hearing'] ?? ''}');
     action = TextEditingController(text: '${r['action_taken'] ?? ''}');
     status = (r['status'] ?? 'साक्ष्य').toString();
+    summonsStatus = (r['summons_status'] ?? 'बनाना है').toString();
     _loadCustomFields();
   }
 
@@ -568,6 +570,26 @@ class _CaseFormState extends State<_CaseForm> {
                           onChanged: (v) => setState(() => status = v ?? status),
                         ),
                         const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: {
+                            ...const ['बनाना है', 'ISSUED', 'NOT ISSUED', 'जारी', ''],
+                            summonsStatus,
+                          }.contains(summonsStatus) ? summonsStatus : 'बनाना है',
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'सम्मन की स्थिति',
+                            prefixIcon: Icon(Icons.mark_email_read_outlined),
+                          ),
+                          items: {
+                            ...const ['बनाना है', 'ISSUED', 'NOT ISSUED', 'जारी', ''],
+                            summonsStatus,
+                          }.map((value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value.isEmpty ? 'स्थिति दर्ज नहीं' : value),
+                          )).toList(),
+                          onChanged: (value) => setState(() => summonsStatus = value ?? summonsStatus),
+                        ),
+                        const SizedBox(height: 12),
                         _field('कृत कार्यवाही', action, lines: 3, icon: Icons.edit_note_rounded),
                       ]),
                       _customFieldsSection(),
@@ -596,6 +618,7 @@ class _CaseFormState extends State<_CaseForm> {
                                   'summoned_witnesses': witnesses.text.trim(),
                                   'next_hearing': nextHearing.text.trim(),
                                   'status': status,
+                                  'summons_status': summonsStatus,
                                   'action_taken': action.text.trim(),
                                   for (final e in customControllers.entries) '__custom__:${e.key}': e.value.text.trim(),
                                   for (final e in customDropdowns.entries) '__custom__:${e.key}': e.value,

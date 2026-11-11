@@ -4,6 +4,7 @@ import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/court_documents_screen.dart';
+import 'screens/summon_generator_screen.dart';
 import 'screens/case_activity_screen.dart';
 import 'screens/case_preparation_screen.dart';
 import 'screens/case_documents_screen.dart';
@@ -261,6 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _QuickAction(icon: Icons.mark_email_unread_rounded, title: 'डाक दर्ज करें', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: dakConfig))),
                         _QuickAction(icon: Icons.assignment_rounded, title: 'रिमांड', color: AppTheme.blue, onTap: () => _open(const RegisterScreen(config: remandConfig))),
                         _QuickAction(icon: Icons.description_rounded, title: 'दस्तावेज बनाएँ', color: AppTheme.teal, onTap: () => _open(const CourtDocumentsScreen())),
+                        _QuickAction(icon: Icons.picture_as_pdf_rounded, title: 'समन जनरेटर', color: AppTheme.blue, onTap: () => _open(const SummonGeneratorScreen())),
                       ],
                     );
                   },
@@ -314,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _ModuleTile(icon: Icons.timeline_rounded, title: 'Timeline एवं Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित काम', color: AppTheme.teal, onTap: () => _open(const CaseActivityScreen())),
         _ModuleTile(icon: Icons.event_available_rounded, title: 'अगली पेशी की तैयारी', subtitle: 'आगामी पेशी और तैयारी का सारांश', color: AppTheme.blue, onTap: () => _open(const CasePreparationScreen())),
         _ModuleTile(icon: Icons.folder_copy_rounded, title: 'दस्तावेज लाइब्रेरी', subtitle: 'केस फाइलें और पुराने संस्करण', color: AppTheme.teal, onTap: () => _open(const CaseDocumentsScreen())),
+        _ModuleTile(icon: Icons.picture_as_pdf_rounded, title: 'समन एवं वारंट जनरेटर', subtitle: 'समन, BW, NBW और मृत्यु आख्या — A4 PDF', color: AppTheme.blue, onTap: () => _open(const SummonGeneratorScreen())),
         _ModuleTile(icon: Icons.inventory_2_outlined, title: 'Evidence एवं Exhibit Manager', subtitle: 'बरामदगी, मालखाना, सील, Exhibit और संलग्न फाइलें', color: AppTheme.teal, onTap: () => _open(const EvidenceScreen())),
         _ModuleTile(icon: Icons.security_rounded, title: 'Audit Log', subtitle: 'ऐप में दर्ज गतिविधियों का रिकॉर्ड', color: AppTheme.blue, onTap: () => _open(const AuditLogScreen())),
         _ModuleTile(icon: Icons.tune_rounded, title: 'Dynamic Field Manager', subtitle: 'नए फील्ड, Dropdown और फील्ड अधिकार नियंत्रित करें', color: AppTheme.blue, onTap: () => _open(const FieldManagerScreen())),

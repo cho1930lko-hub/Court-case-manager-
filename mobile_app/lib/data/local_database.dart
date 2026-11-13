@@ -27,7 +27,7 @@ class LocalDatabase {
     _db = await openDatabase(
       path,
       password: key,
-      version: 5,
+      version: 6,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
         // journal_mode returns a result row; use rawQuery rather than execute.
@@ -47,6 +47,18 @@ class LocalDatabase {
     if (oldVersion < 4) await _createDynamicFieldTables(db);
     if (oldVersion < 4) await _createDynamicDataTables(db);
     if (oldVersion < 5) await ensurePhase8MigrationSchema(db);
+    if (oldVersion < 6) await _createWorklistSchema(db);
+  }
+
+  Future<void> _createWorklistSchema(Database db) async {
+    // Version 6 is reserved for the additive Worklist schema on this branch.
+    // Do not import ZIP v7-v9 migrations until their sync/eCourts dependencies are reconciled.
+    await db.execute(WorklistSql.hearingHistory);
+    await db.execute(WorklistSql.caseTasks);
+    await db.execute(WorklistSql.taskHistory);
+    for (final index in WorklistSql.indexes) {
+      await db.execute(index);
+    }
   }
 
   Future<void> _migratePlainDatabaseIfNeeded(String path, String key) async {

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../services/secure_database_key.dart';
+import '../core/worklist_sql.dart';
 
 /// Local-first database. No network or Google account is required.
 /// Schema is additive: future upgrades must use versioned migrations.

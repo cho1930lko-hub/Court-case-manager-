@@ -48,11 +48,23 @@ class LocalDatabase {
     if (oldVersion < 4) await _createDynamicDataTables(db);
     if (oldVersion < 5) await ensurePhase8MigrationSchema(db);
     if (oldVersion < 6) await _createWorklistSchema(db);
+    if (oldVersion < 6) await _createWorklistSchema(db);
   }
 
   Future<void> _createWorklistSchema(Database db) async {
     // Version 6 is reserved for the additive Worklist schema on this branch.
     // Do not import ZIP v7-v9 migrations until their sync/eCourts dependencies are reconciled.
+    await db.execute(WorklistSql.hearingHistory);
+    await db.execute(WorklistSql.caseTasks);
+    await db.execute(WorklistSql.taskHistory);
+    for (final index in WorklistSql.indexes) {
+      await db.execute(index);
+    }
+  }
+
+  Future<void> _createWorklistSchema(Database db) async {
+    // Version 6 is reserved for the additive Worklist schema on this branch.
+    // ZIP v7-v9 migrations are intentionally not skipped or imported yet.
     await db.execute(WorklistSql.hearingHistory);
     await db.execute(WorklistSql.caseTasks);
     await db.execute(WorklistSql.taskHistory);

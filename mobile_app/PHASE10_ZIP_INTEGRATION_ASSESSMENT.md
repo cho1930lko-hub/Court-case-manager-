@@ -57,3 +57,13 @@ Status: assessment only; no application feature files have been copied yet.
 - Feature integration: not yet performed.
 - Flutter analyze/tests/build: not yet run.
 - Production database: not accessed or modified.
+
+
+## Phase 10A execution update
+
+- Added `mobile_app/lib/core/worklist_sql.dart` with three additive tables and four indexes.
+- Updated `LocalDatabase` to schema version 6 on this branch and added an `oldVersion < 6` migration step.
+- The v6 step uses `CREATE TABLE/INDEX IF NOT EXISTS`; it does not alter, rename, or delete existing tables or rows.
+- Kept the ZIP's v7-v9 sync/eCourts migrations out of this step. They are not safe to skip or partially import into the Phase 8 baseline.
+- Verified the three table definitions and four indexes using SQLite, including a repeat run to check idempotency: PASS.
+- Flutter analyzer, Dart tests, Android build, and an upgrade test against a copied real v5 database are still pending; do not treat this as APK-ready.

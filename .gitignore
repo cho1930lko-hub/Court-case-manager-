@@ -6,3 +6,17 @@ venv/
 !sample*.xlsx
 .streamlit/secrets.toml
 *.log
+
+# Flutter / Android signing material — NEVER commit real credentials
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
+**/*.pem
+**/*.key
+**/secrets.json
+**/secrets.yaml
+**/.env
+**/.env.*
+!**/.env.example

@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../services/secure_database_key.dart';
 import '../core/worklist_sql.dart';
+import '../core/worklist_engine.dart';
+import '../core/dates.dart';
 
 /// Local-first database. No network or Google account is required.
 /// Schema is additive: future upgrades must use versioned migrations.
@@ -995,6 +997,98 @@ class LocalDatabase {
       final changed = await txn.delete('evidence_items', where: 'id = ?', whereArgs: [id]);
       if (changed != 1) throw StateError('Evidence record not found');
       await _insertAudit(txn, 'EVIDENCE_RECORD_DELETED', 'EVIDENCE', id, description);
+    });
+  }
+
+  String _newWorkId() => '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
+
+  Future<List<Map<String, Object?>>> worklistTasks() async {
+    final db = await database;
+    return db.query('case_tasks', where: "status = 'pending' OR task_type = ?", whereArgs: [WorklistEngine.taskDismissal]);
+  }
+
+  Future<Map<String, List<Map<String, Object?>>>> weeklyReportRows() async {
+    final db = await database;
+    return {'history': await db.query('hearing_history'), 'tasks': await db.query('case_tasks')};
+  }
+
+  Future<List<Map<String, Object?>>> hearingHistoryFor(String caseId) async {
+    final db = await database;
+    return db.query('hearing_history', where: 'case_id = ?', whereArgs: [caseId], orderBy: 'created_at DESC');
+  }
+
+  Future<String> saveHearingUpdate({
+    required String caseId, required String heldDate, String outcome = '',
+    String nextDate = '', String witnessStatus = '', String summonsStatus = '',
+    String orderSummary = '', String nextAction = '', String compliance = '',
+    String notes = '', required bool applyNextDate, required bool applySummons,
+    required bool createTasks,
+  }) async {
+    final heldParsed = AppDates.parse(heldDate);
+    final nextParsed = AppDates.parse(nextDate);
+    if (heldParsed == null) throw ArgumentError('पेशी की तारीख सही नहीं');
+    if (applyNextDate && nextParsed == null) throw ArgumentError('अगली तारीख सही नहीं');
+    final held = AppDates.format(heldParsed);
+    final next = nextParsed == null ? '' : AppDates.format(nextParsed);
+    final db = await database, id = _newWorkId(), now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      final rows = await txn.query('cases', columns: ['id'], where: 'id = ? AND is_archived = 0', whereArgs: [caseId], limit: 1);
+      if (rows.isEmpty) throw StateError('केस नहीं मिला या संग्रहित है');
+      await txn.insert('hearing_history', {
+        'id': id, 'case_id': caseId, 'hearing_date': held, 'outcome': outcome.trim(),
+        'next_date': next, 'witness_status': witnessStatus.trim(), 'summons_status': summonsStatus.trim(),
+        'order_summary': orderSummary.trim(), 'next_action': nextAction.trim(), 'compliance': compliance.trim(),
+        'notes': notes.trim(), 'date_applied': applyNextDate ? 1 : 0,
+        'summons_applied': applySummons && summonsStatus.trim().isNotEmpty ? 1 : 0, 'created_at': now,
+      });
+      final update = <String, Object?>{};
+      if (applyNextDate) { update['next_hearing'] = next; update['previous_hearing'] = held; }
+      if (applySummons && summonsStatus.trim().isNotEmpty) update['summons_status'] = summonsStatus.trim();
+      if (update.isNotEmpty) { update['updated_at'] = now; await txn.update('cases', update, where: 'id = ?', whereArgs: [caseId]); }
+      if (createTasks) {
+        Future<void> addTask(String suffix, String type, String title) async {
+          if (title.trim().isEmpty) return;
+          final taskId = _newWorkId();
+          final n = await txn.insert('case_tasks', {
+            'id': taskId, 'case_id': caseId, 'task_type': type, 'title': title.trim(),
+            'due_date': next, 'priority': 2, 'status': 'pending', 'source': 'hearing_update',
+            'dedupe_key': 'hu:$id:$suffix', 'created_at': now,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          if (n > 0) await txn.insert('case_task_history', {'task_id': taskId, 'action': 'created', 'at': now, 'note': 'पेशी-अपडेट से'});
+        }
+        await addTask('next_action', 'other', nextAction);
+        await addTask('compliance', 'compliance', compliance);
+      }
+      await _insertAudit(txn, 'HEARING_UPDATED', 'SESSION', caseId, 'पेशी $held दर्ज');
+    });
+    return id;
+  }
+
+  Future<void> completeTask(String taskId, {String note = ''}) async {
+    final db = await database, now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      final n = await txn.update('case_tasks', {'status': 'done', 'completed_at': now}, where: "id = ? AND status = 'pending'", whereArgs: [taskId]);
+      if (n > 0) await txn.insert('case_task_history', {'task_id': taskId, 'action': 'done', 'at': now, 'note': note});
+    });
+  }
+
+  Future<void> dismissTask(String taskId) async {
+    final db = await database, now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      final n = await txn.update('case_tasks', {'status': 'dismissed', 'dismissed_at': now}, where: "id = ? AND status = 'pending'", whereArgs: [taskId]);
+      if (n > 0) await txn.insert('case_task_history', {'task_id': taskId, 'action': 'dismissed', 'at': now, 'note': ''});
+    });
+  }
+
+  Future<void> dismissDerived({required String caseId, required String dedupeKey, String note = ''}) async {
+    final db = await database, now = DateTime.now().toIso8601String(), taskId = _newWorkId();
+    await db.transaction((txn) async {
+      final n = await txn.insert('case_tasks', {
+        'id': taskId, 'case_id': caseId, 'task_type': WorklistEngine.taskDismissal,
+        'title': note, 'status': 'dismissed', 'source': 'user', 'dedupe_key': dedupeKey,
+        'created_at': now, 'dismissed_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      if (n > 0) await txn.insert('case_task_history', {'task_id': taskId, 'action': 'dismissed_reminder', 'at': now, 'note': dedupeKey});
     });
   }
 

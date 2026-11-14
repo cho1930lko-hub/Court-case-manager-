@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'data/local_database.dart';
 import 'screens/cases_screen.dart';
+import 'screens/daily_worklist_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/court_documents_screen.dart';
 import 'screens/summon_generator_screen.dart';
@@ -313,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text('रजिस्टर, दस्तावेज और डिवाइस सुविधाएँ', style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 18),
         _ModuleTile(icon: Icons.contact_phone_rounded, title: 'Address Book', subtitle: 'अधिकारी, गवाह और विभागीय संपर्क', color: AppTheme.teal, onTap: () => _open(const RegisterScreen(config: addressConfig))),
+        _ModuleTile(icon: Icons.checklist_rounded, title: 'दैनिक कार्य-सूची', subtitle: 'आज की पेशी, सम्मन और समय-सीमा वाले कार्य', color: AppTheme.blue, onTap: () => _open(const DailyWorklistScreen())),
         _ModuleTile(icon: Icons.timeline_rounded, title: 'Timeline एवं Checklist', subtitle: 'तारीखवार कार्यवाही और लंबित काम', color: AppTheme.teal, onTap: () => _open(const CaseActivityScreen())),
         _ModuleTile(icon: Icons.event_available_rounded, title: 'अगली पेशी की तैयारी', subtitle: 'आगामी पेशी और तैयारी का सारांश', color: AppTheme.blue, onTap: () => _open(const CasePreparationScreen())),
         _ModuleTile(icon: Icons.folder_copy_rounded, title: 'दस्तावेज लाइब्रेरी', subtitle: 'केस फाइलें और पुराने संस्करण', color: AppTheme.teal, onTap: () => _open(const CaseDocumentsScreen())),
